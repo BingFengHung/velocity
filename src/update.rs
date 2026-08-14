@@ -90,11 +90,8 @@ pub fn check_and_update(check_only: bool) -> Result<(), String> {
 }
 
 fn is_newer_version(latest: &str, current: &str) -> bool {
-    let parse_v = |v: &str| -> Vec<u32> {
-        v.split('.')
-            .filter_map(|s| s.parse::<u32>().ok())
-            .collect()
-    };
+    let parse_v =
+        |v: &str| -> Vec<u32> { v.split('.').filter_map(|s| s.parse::<u32>().ok()).collect() };
 
     let latest_parts = parse_v(latest);
     let current_parts = parse_v(current);
