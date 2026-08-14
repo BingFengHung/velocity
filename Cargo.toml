@@ -1,6 +1,6 @@
 [package]
 name = "velocity"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2021"
 authors = ["Velocity Developers"]
 description = "A blazingly fast, modern terminal file browser with two-pane layout, true-color theme, instant search, and Nerd Font icons."

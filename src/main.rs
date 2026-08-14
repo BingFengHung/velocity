@@ -61,27 +61,45 @@ fn main() -> io::Result<()> {
 }
 
 fn run_app<W: io::Write>(stdout: &mut W, app: &mut App) -> io::Result<()> {
+    let mut needs_render = true;
+
     loop {
         let (width, height) = crossterm::terminal::size().unwrap_or((80, 24));
         let layout = TerminalLayout::calculate(width, height);
 
-        app.adjust_scroll(layout.inner_h as usize);
-
-        render_ui(stdout, app, &layout)?;
+        if needs_render {
+            app.adjust_scroll(layout.inner_h as usize);
+            render_ui(stdout, app, &layout)?;
+            needs_render = false;
+        }
 
         if app.should_quit {
             break;
         }
 
-        if event::poll(Duration::from_millis(100))? {
+        let poll_duration = if app.status_message.is_some() {
+            Duration::from_millis(100)
+        } else {
+            Duration::from_millis(250)
+        };
+
+        if event::poll(poll_duration)? {
             match event::read()? {
                 Event::Key(key_event) => {
                     if key_event.kind == KeyEventKind::Press {
                         app.handle_key(key_event, layout.inner_h as usize);
+                        needs_render = true;
                     }
                 }
-                Event::Resize(_, _) => {}
+                Event::Resize(_, _) => {
+                    needs_render = true;
+                }
                 _ => {}
+            }
+        } else if let Some((_, instant)) = app.status_message {
+            if instant.elapsed() >= Duration::from_secs(3) {
+                app.status_message = None;
+                needs_render = true;
             }
         }
     }

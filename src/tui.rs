@@ -114,7 +114,8 @@ pub fn render_ui<W: Write>(stdout: &mut W, app: &App, layout: &TerminalLayout) -
 
     let sort_badge = format!(" [排序: {}] ", app.sort_mode.display_name());
     let path_str = app.current_dir.to_string_lossy();
-    let left_title = format!("  {}  {}", folder_icon, path_str);
+    let clean_path = path_str.strip_prefix(r"\\?\").unwrap_or(&path_str);
+    let left_title = format!("  {}  {}", folder_icon, clean_path);
 
     let title_space = (layout.width as usize)
         .saturating_sub(left_title.width())
@@ -137,32 +138,10 @@ pub fn render_ui<W: Write>(stdout: &mut W, app: &App, layout: &TerminalLayout) -
     stdout.queue(SetAttribute(Attribute::Reset))?;
 
     // 2. Borders
-    stdout.queue(SetForegroundColor(THEME.border))?;
     stdout.queue(SetBackgroundColor(THEME.bg))?;
 
-    let left_bar_len = (layout.left_w.saturating_sub(1)) as usize;
-    let right_bar_len = (layout.right_w.saturating_sub(2)) as usize;
-    let top_border = format!(
-        "┌{}┬{}┐",
-        "─".repeat(left_bar_len),
-        "─".repeat(right_bar_len)
-    );
-    stdout.queue(MoveTo(0, layout.top))?;
-    write!(stdout, "{}", top_border)?;
-
-    let bottom_border = format!(
-        "└{}┴{}┘",
-        "─".repeat(left_bar_len),
-        "─".repeat(right_bar_len)
-    );
-    stdout.queue(MoveTo(0, layout.bottom))?;
-    write!(stdout, "{}", bottom_border)?;
-
-    // Left Panel Header (Items Count)
-    stdout.queue(MoveTo(2, layout.top))?;
-    stdout.queue(SetForegroundColor(THEME.accent))?;
-    let items_badge = format!(" 檔案 ({}) ", app.filtered_items.len());
-    write!(stdout, "{}", items_badge)?;
+    let left_w = layout.left_w as usize;
+    let right_w = layout.right_w as usize;
 
     let selected_entry =
         if !app.filtered_items.is_empty() && app.selected < app.filtered_items.len() {
@@ -171,12 +150,27 @@ pub fn render_ui<W: Write>(stdout: &mut W, app: &App, layout: &TerminalLayout) -
             None
         };
 
-    // Right Panel Header
-    let right_title_max_w = layout.right_w.saturating_sub(4) as usize;
-    if let Some(entry) = selected_entry {
-        stdout.queue(MoveTo(layout.right_x + 2, layout.top))?;
-        stdout.queue(SetForegroundColor(THEME.search))?;
+    // Top Border (Single Pass without overdraw)
+    stdout.queue(MoveTo(0, layout.top))?;
+    stdout.queue(SetForegroundColor(THEME.border))?;
+    write!(stdout, "┌─")?;
 
+    let items_badge = format!(" 檔案 ({}) ", app.filtered_items.len());
+    let badge_w = items_badge.width();
+    stdout.queue(SetForegroundColor(THEME.accent))?;
+    write!(stdout, "{}", items_badge)?;
+
+    stdout.queue(SetForegroundColor(THEME.border))?;
+    let left_fill = left_w.saturating_sub(2 + badge_w);
+    if left_fill > 0 {
+        write!(stdout, "{}", "─".repeat(left_fill))?;
+    }
+
+    stdout.queue(MoveTo(layout.left_w, layout.top))?;
+    write!(stdout, "┬")?;
+
+    if let Some(entry) = selected_entry {
+        let max_title_w = right_w.saturating_sub(4);
         let header_str = if entry.is_dir {
             format!(" {}  {}", folder_icon, entry.name)
         } else {
@@ -187,8 +181,38 @@ pub fn render_ui<W: Write>(stdout: &mut W, app: &App, layout: &TerminalLayout) -
                 format_time(entry.modified)
             )
         };
-        write!(stdout, "{}", fit_width(&header_str, right_title_max_w))?;
+        let fitted_header = fit_width(&header_str, max_title_w);
+        let header_w = fitted_header.width();
+
+        write!(stdout, "─ ")?;
+        stdout.queue(SetForegroundColor(THEME.search))?;
+        write!(stdout, "{}", fitted_header)?;
+        stdout.queue(SetForegroundColor(THEME.border))?;
+
+        let right_fill = right_w.saturating_sub(3 + header_w);
+        if right_fill > 0 {
+            write!(stdout, "{}", "─".repeat(right_fill))?;
+        }
+    } else {
+        let right_fill = right_w.saturating_sub(2);
+        if right_fill > 0 {
+            write!(stdout, "{}", "─".repeat(right_fill))?;
+        }
     }
+
+    stdout.queue(MoveTo(layout.width.saturating_sub(1), layout.top))?;
+    write!(stdout, "┐")?;
+
+    // Bottom Border
+    let left_bar_len = (layout.left_w.saturating_sub(1)) as usize;
+    let right_bar_len = (layout.right_w.saturating_sub(2)) as usize;
+    let bottom_border = format!(
+        "└{}┴{}┘",
+        "─".repeat(left_bar_len),
+        "─".repeat(right_bar_len)
+    );
+    stdout.queue(MoveTo(0, layout.bottom))?;
+    write!(stdout, "{}", bottom_border)?;
 
     stdout.queue(ResetColor)?;
 
