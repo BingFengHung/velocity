@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use std::env;
 use std::fs::{self, File};
-use std::io::{self, Cursor, Read, Write};
+use std::io::{Cursor, Read, Write};
 use std::path::Path;
 use zip::ZipArchive;
 
@@ -65,7 +65,7 @@ pub fn check_and_update(check_only: bool) -> Result<(), String> {
         })?;
 
     println!("📦 正在下載更新檔: {}...", asset.name);
-    let mut download_resp = ureq::get(&asset.browser_download_url)
+    let download_resp = ureq::get(&asset.browser_download_url)
         .set("User-Agent", "velocity-updater")
         .call()
         .map_err(|e| format!("下載資產失敗: {}", e))?;

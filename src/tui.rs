@@ -1,4 +1,4 @@
-use crate::app::{App, FilteredEntry, InputMode};
+use crate::app::{App, InputMode};
 use crate::cli::IconStyle;
 use crate::config::{PREVIEW_MAX_BYTES, PREVIEW_MAX_LINES, THEME};
 use crate::fs::{format_size, format_time, read_preview, PreviewContent};
@@ -27,7 +27,7 @@ pub fn fit_width(text: &str, target_width: usize) -> String {
             }
             current_width += space_needed;
         } else if ch.is_control() {
-            if current_width + 1 <= target_width {
+            if current_width < target_width {
                 result.push(' ');
                 current_width += 1;
             } else {

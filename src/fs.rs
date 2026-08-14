@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::SystemTime;
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct FileEntry {
     pub name: String,
@@ -34,6 +35,7 @@ pub struct ImagePreviewInfo {
     pub grid: Vec<Vec<PixelCell>>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum PreviewContent {
     Directory {
@@ -298,7 +300,7 @@ pub fn load_image_preview(path: &Path, max_w: usize, max_h: usize) -> Option<Ima
     let mut grid = Vec::new();
     let panel_bg = (30, 30, 38);
 
-    let row_count = (thumb_h as usize + 1) / 2;
+    let row_count = (thumb_h as usize).div_ceil(2);
     for row in 0..row_count {
         let mut row_cells = Vec::with_capacity(thumb_w as usize);
         let top_y = (row * 2) as u32;
@@ -371,9 +373,8 @@ pub fn read_preview(
 
         // 1. Check for archive preview (ZIP)
         if ARCHIVE_EXTENSIONS.contains(&entry.extension.as_str()) {
-            match read_zip_preview(&entry.path, max_lines.saturating_sub(2)) {
-                Ok(info) => return PreviewContent::Archive(info),
-                Err(_) => {} // Fallback to binary
+            if let Ok(info) = read_zip_preview(&entry.path, max_lines.saturating_sub(2)) {
+                return PreviewContent::Archive(info);
             }
         }
 

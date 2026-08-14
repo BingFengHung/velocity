@@ -22,6 +22,7 @@ const COLOR_TYPE: Color = Color::Rgb {
     g: 210,
     b: 255,
 };
+#[allow(dead_code)]
 const COLOR_FUNCTION: Color = Color::Rgb {
     r: 140,
     g: 230,

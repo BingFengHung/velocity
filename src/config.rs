@@ -29,6 +29,7 @@ impl SortMode {
     }
 }
 
+#[allow(dead_code)]
 pub struct ThemeColors {
     pub bg: Color,
     pub panel: Color,

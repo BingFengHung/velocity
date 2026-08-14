@@ -44,7 +44,7 @@ pub struct App {
 
 impl App {
     pub fn new(initial_path: PathBuf, icon_style: IconStyle, show_hidden: bool) -> Self {
-        let abs_path = std::fs::canonicalize(&initial_path).unwrap_or_else(|_| initial_path);
+        let abs_path = std::fs::canonicalize(&initial_path).unwrap_or(initial_path);
         let abs_path = if let Ok(stripped) = abs_path.strip_prefix(r"\\?\") {
             stripped.to_path_buf()
         } else {
@@ -241,13 +241,12 @@ impl App {
                         self.filter.pop();
                         self.apply_filter();
                     }
-                    KeyCode::Char(c) => {
+                    KeyCode::Char(c)
                         if !key.modifiers.contains(KeyModifiers::CONTROL)
-                            && !key.modifiers.contains(KeyModifiers::ALT)
-                        {
-                            self.filter.push(c);
-                            self.apply_filter();
-                        }
+                            && !key.modifiers.contains(KeyModifiers::ALT) =>
+                    {
+                        self.filter.push(c);
+                        self.apply_filter();
                     }
                     _ => {}
                 }
