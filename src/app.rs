@@ -340,8 +340,7 @@ impl App {
                 }
             }
             KeyCode::Down | KeyCode::Char('j') => {
-                if !self.filtered_items.is_empty()
-                    && self.selected < self.filtered_items.len() - 1
+                if !self.filtered_items.is_empty() && self.selected < self.filtered_items.len() - 1
                 {
                     self.selected += 1;
                 }
