@@ -43,6 +43,7 @@ pub struct App {
 }
 
 impl App {
+    pub fn new(initial_path: PathBuf, icon_style: IconStyle, show_hidden: bool) -> Self {
         let abs_path = std::fs::canonicalize(&initial_path).unwrap_or_else(|_| initial_path);
         let abs_path = if let Ok(stripped) = abs_path.strip_prefix(r"\\?\") {
             stripped.to_path_buf()
