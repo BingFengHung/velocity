@@ -1,4 +1,5 @@
 use chrono::{DateTime, Local};
+use image::{imageops::FilterType, DynamicImage, GenericImageView, ImageReader};
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -16,6 +17,20 @@ pub struct FileEntry {
     pub is_hidden: bool,
 }
 
+#[derive(Clone, Debug)]
+pub struct PixelCell {
+    pub top: (u8, u8, u8),
+    pub bottom: (u8, u8, u8),
+}
+
+#[derive(Clone, Debug)]
+pub struct ImagePreviewInfo {
+    pub orig_width: u32,
+    pub orig_height: u32,
+    pub format_name: String,
+    pub grid: Vec<Vec<PixelCell>>,
+}
+
 #[derive(Debug)]
 pub enum PreviewContent {
     Directory {
@@ -27,6 +42,7 @@ pub enum PreviewContent {
         total_lines: usize,
         truncated: bool,
     },
+    Image(ImagePreviewInfo),
     Binary {
         size: u64,
     },
@@ -44,6 +60,10 @@ const TEXT_EXTENSIONS: &[&str] = &[
     "sql", "sh", "bash", "zsh", "bat", "cmd", "toml", "env", "gitignore", "dockerfile", "tf",
     "tsv", "properties", "vue", "svelte", "swift", "kt", "kts", "dart", "lua", "r", "scala",
     "zig", "v", "nim", "odin", "graphql", "proto", "rst", "tex", "bib", "diff", "patch",
+];
+
+const IMAGE_EXTENSIONS: &[&str] = &[
+    "png", "jpg", "jpeg", "gif", "webp", "bmp", "ico",
 ];
 
 pub fn read_directory(path: &Path, show_hidden: bool) -> io::Result<Vec<FileEntry>> {
@@ -111,6 +131,10 @@ pub fn is_text_file(path: &Path, ext: &str, size: u64) -> bool {
         return true;
     }
 
+    if IMAGE_EXTENSIONS.contains(&ext) {
+        return false;
+    }
+
     // Inspect first 4096 bytes for null bytes or invalid non-text binary indicators
     if let Ok(mut file) = File::open(path) {
         let mut buffer = [0u8; 4096];
@@ -123,12 +147,15 @@ pub fn is_text_file(path: &Path, ext: &str, size: u64) -> bool {
             if slice.contains(&0) {
                 return false;
             }
-            // Check UTF-8 validity or high ASCII text ratio
+            // Check UTF-8 validity
             if std::str::from_utf8(slice).is_ok() {
                 return true;
             }
             // If invalid UTF-8, check if mostly printable ASCII/whitespace
-            let printable = slice.iter().filter(|&&b| b == b'\t' || b == b'\n' || b == b'\r' || (32..=126).contains(&b)).count();
+            let printable = slice
+                .iter()
+                .filter(|&&b| b == b'\t' || b == b'\n' || b == b'\r' || (32..=126).contains(&b))
+                .count();
             return (printable as f64 / n as f64) > 0.85;
         }
     }
@@ -136,7 +163,99 @@ pub fn is_text_file(path: &Path, ext: &str, size: u64) -> bool {
     false
 }
 
-pub fn read_preview(entry: &FileEntry, max_lines: usize, max_bytes: u64) -> PreviewContent {
+fn blend_color(fg: (u8, u8, u8), alpha: u8, bg: (u8, u8, u8)) -> (u8, u8, u8) {
+    if alpha == 255 {
+        return fg;
+    }
+    if alpha == 0 {
+        return bg;
+    }
+    let a = alpha as f32 / 255.0;
+    let r = (fg.0 as f32 * a + bg.0 as f32 * (1.0 - a)).round() as u8;
+    let g = (fg.1 as f32 * a + bg.1 as f32 * (1.0 - a)).round() as u8;
+    let b = (fg.2 as f32 * a + bg.2 as f32 * (1.0 - a)).round() as u8;
+    (r, g, b)
+}
+
+pub fn load_image_preview(path: &Path, max_w: usize, max_h: usize) -> Option<ImagePreviewInfo> {
+    if max_w == 0 || max_h == 0 {
+        return None;
+    }
+
+    let reader = ImageReader::open(path).ok()?.with_guessed_format().ok()?;
+    let format_str = reader
+        .format()
+        .map(|f| format!("{:?}", f).to_uppercase())
+        .unwrap_or_else(|| "IMAGE".to_string());
+
+    let dynamic_img: DynamicImage = reader.decode().ok()?;
+    let (orig_w, orig_h) = dynamic_img.dimensions();
+
+    if orig_w == 0 || orig_h == 0 {
+        return None;
+    }
+
+    // Terminal characters have ~2:1 height/width ratio.
+    // Since each character cell displays 2 vertical pixels (via \u{2580}),
+    // the target pixel canvas is max_w (columns) by max_h * 2 (pixel rows).
+    let target_pixel_w = max_w as u32;
+    let target_pixel_h = (max_h * 2) as u32;
+
+    // Calculate aspect ratio preserving thumbnail
+    let thumb = dynamic_img.resize(target_pixel_w, target_pixel_h, FilterType::Triangle);
+    let rgba_img = thumb.to_rgba8();
+    let (thumb_w, thumb_h) = rgba_img.dimensions();
+
+    let mut grid = Vec::new();
+    let panel_bg = (30, 30, 38); // Panel background color for alpha blending
+
+    let row_count = (thumb_h as usize + 1) / 2;
+    for row in 0..row_count {
+        let mut row_cells = Vec::with_capacity(thumb_w as usize);
+        let top_y = (row * 2) as u32;
+        let bottom_y = (row * 2 + 1) as u32;
+
+        for x in 0..thumb_w {
+            let top_pixel = rgba_img.get_pixel(x, top_y);
+            let top_rgb = blend_color(
+                (top_pixel[0], top_pixel[1], top_pixel[2]),
+                top_pixel[3],
+                panel_bg,
+            );
+
+            let bottom_rgb = if bottom_y < thumb_h {
+                let bottom_pixel = rgba_img.get_pixel(x, bottom_y);
+                blend_color(
+                    (bottom_pixel[0], bottom_pixel[1], bottom_pixel[2]),
+                    bottom_pixel[3],
+                    panel_bg,
+                )
+            } else {
+                panel_bg
+            };
+
+            row_cells.push(PixelCell {
+                top: top_rgb,
+                bottom: bottom_rgb,
+            });
+        }
+        grid.push(row_cells);
+    }
+
+    Some(ImagePreviewInfo {
+        orig_width: orig_w,
+        orig_height: orig_h,
+        format_name: format_str,
+        grid,
+    })
+}
+
+pub fn read_preview(
+    entry: &FileEntry,
+    max_lines: usize,
+    max_bytes: u64,
+    avail_width: usize,
+) -> PreviewContent {
     if entry.is_dir {
         match read_directory(&entry.path, true) {
             Ok(sub_items) => {
@@ -159,6 +278,15 @@ pub fn read_preview(entry: &FileEntry, max_lines: usize, max_bytes: u64) -> Prev
     } else {
         if entry.size == 0 {
             return PreviewContent::Empty;
+        }
+
+        // Check for image preview
+        if IMAGE_EXTENSIONS.contains(&entry.extension.as_str()) {
+            let img_max_h = max_lines.saturating_sub(2);
+            let img_max_w = avail_width.saturating_sub(4);
+            if let Some(info) = load_image_preview(&entry.path, img_max_w, img_max_h) {
+                return PreviewContent::Image(info);
+            }
         }
 
         if entry.size > max_bytes {
@@ -260,7 +388,11 @@ pub fn open_in_editor(path: &Path) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         // Try VS Code first, then Notepad
-        if Command::new("cmd").args(["/C", "code", path.to_str().unwrap_or_default()]).spawn().is_ok() {
+        if Command::new("cmd")
+            .args(["/C", "code", path.to_str().unwrap_or_default()])
+            .spawn()
+            .is_ok()
+        {
             return Ok(());
         }
         if Command::new("notepad.exe").arg(path).spawn().is_ok() {

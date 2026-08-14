@@ -1,10 +1,12 @@
+use crate::cli::IconStyle;
 use crate::config::{PREVIEW_MAX_BYTES, PREVIEW_MAX_LINES, THEME};
 use crate::fs::{format_size, format_time, read_preview, FileEntry, PreviewContent};
 use crate::icons::get_icon;
 use crate::theme::get_file_color;
-use crate::cli::IconStyle;
 use crossterm::cursor::MoveTo;
-use crossterm::style::{Attribute, Color, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor};
+use crossterm::style::{
+    Attribute, Color, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor,
+};
 use crossterm::QueueableCommand;
 use std::io::{self, Write};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
@@ -174,7 +176,10 @@ pub fn render_ui<W: Write>(
 
     // 3. Render Left List & Right Preview Lines
     let list_height = layout.inner_h as usize;
-    let preview_content = selected_entry.map(|e| read_preview(e, PREVIEW_MAX_LINES, PREVIEW_MAX_BYTES));
+    let right_cell_w = layout.right_w.saturating_sub(3) as usize;
+    let preview_content = selected_entry.map(|e| {
+        read_preview(e, PREVIEW_MAX_LINES, PREVIEW_MAX_BYTES, right_cell_w)
+    });
 
     for row in 0..list_height {
         let y = layout.top + 1 + (row as u16);
@@ -235,14 +240,59 @@ pub fn render_ui<W: Write>(
         }
 
         // Render Right Preview Cell
-        let right_cell_w = layout.right_w.saturating_sub(3) as usize;
         stdout.queue(MoveTo(layout.right_x + 1, y))?;
         stdout.queue(SetBackgroundColor(THEME.panel))?;
         stdout.queue(SetForegroundColor(THEME.file))?;
 
-        let line_text = match &preview_content {
-            Some(PreviewContent::Directory { items: sub_items, total_items }) => {
+        match &preview_content {
+            Some(PreviewContent::Image(img_info)) => {
                 if row == 0 {
+                    let info_line = format!(
+                        " 🖼️ 格式: {} · 解析度: {}x{} · 大小: {}",
+                        img_info.format_name,
+                        img_info.orig_width,
+                        img_info.orig_height,
+                        selected_entry.map(|e| format_size(e.size)).unwrap_or_default()
+                    );
+                    stdout.queue(SetForegroundColor(THEME.accent))?;
+                    write!(stdout, "{}", fit_width(&info_line, right_cell_w))?;
+                } else if row == 1 {
+                    write!(stdout, "{}", " ".repeat(right_cell_w))?;
+                } else {
+                    let img_row = row - 2;
+                    if img_row < img_info.grid.len() {
+                        let cells = &img_info.grid[img_row];
+                        let rendered_cols = cells.len().min(right_cell_w);
+                        write!(stdout, " ")?; // 1 column left padding
+                        for cell in &cells[..rendered_cols.saturating_sub(1)] {
+                            stdout.queue(SetForegroundColor(Color::Rgb {
+                                r: cell.top.0,
+                                g: cell.top.1,
+                                b: cell.top.2,
+                            }))?;
+                            stdout.queue(SetBackgroundColor(Color::Rgb {
+                                r: cell.bottom.0,
+                                g: cell.bottom.1,
+                                b: cell.bottom.2,
+                            }))?;
+                            write!(stdout, "▀")?;
+                        }
+                        stdout.queue(SetBackgroundColor(THEME.panel))?;
+                        stdout.queue(ResetColor)?;
+                        let remaining_pad = right_cell_w.saturating_sub(rendered_cols);
+                        if remaining_pad > 0 {
+                            write!(stdout, "{}", " ".repeat(remaining_pad))?;
+                        }
+                    } else {
+                        write!(stdout, "{}", " ".repeat(right_cell_w))?;
+                    }
+                }
+            }
+            Some(PreviewContent::Directory {
+                items: sub_items,
+                total_items,
+            }) => {
+                let line_text = if row == 0 {
                     format!(" 📁 目錄包含 {} 個項目", total_items)
                 } else if row == 1 {
                     String::new()
@@ -253,50 +303,56 @@ pub fn render_ui<W: Write>(
                     } else {
                         String::new()
                     }
-                }
+                };
+                write!(stdout, "{}", fit_width(&line_text, right_cell_w))?;
             }
             Some(PreviewContent::Text { lines, .. }) => {
-                if row < lines.len() {
+                let line_text = if row < lines.len() {
                     format!(" {}", lines[row])
                 } else {
                     String::new()
-                }
+                };
+                write!(stdout, "{}", fit_width(&line_text, right_cell_w))?;
             }
             Some(PreviewContent::Binary { size }) => {
-                if row == 1 {
+                let line_text = if row == 1 {
                     format!("   <二進位檔案或不支援預覽 — {}>", format_size(*size))
                 } else {
                     String::new()
-                }
+                };
+                write!(stdout, "{}", fit_width(&line_text, right_cell_w))?;
             }
             Some(PreviewContent::TooLarge { size }) => {
-                if row == 1 {
+                let line_text = if row == 1 {
                     format!(
                         "   <檔案過大 ({}) — 按 'e' 使用編輯器開啟>",
                         format_size(*size)
                     )
                 } else {
                     String::new()
-                }
+                };
+                write!(stdout, "{}", fit_width(&line_text, right_cell_w))?;
             }
             Some(PreviewContent::Empty) => {
-                if row == 1 {
+                let line_text = if row == 1 {
                     "   <空檔案>".to_string()
                 } else {
                     String::new()
-                }
+                };
+                write!(stdout, "{}", fit_width(&line_text, right_cell_w))?;
             }
             Some(PreviewContent::Error(err)) => {
-                if row == 1 {
+                let line_text = if row == 1 {
                     format!("   <{}>", err)
                 } else {
                     String::new()
-                }
+                };
+                write!(stdout, "{}", fit_width(&line_text, right_cell_w))?;
             }
-            None => String::new(),
-        };
-
-        write!(stdout, "{}", fit_width(&line_text, right_cell_w))?;
+            None => {
+                write!(stdout, "{}", " ".repeat(right_cell_w))?;
+            }
+        }
     }
 
     // 4. Bottom Status / Search Bar

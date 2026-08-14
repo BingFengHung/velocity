@@ -1,6 +1,6 @@
 [package]
 name = "velocity"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Velocity Developers"]
 description = "A blazingly fast, modern terminal file browser with two-pane layout, true-color theme, instant search, and Nerd Font icons."
@@ -14,6 +14,7 @@ clap = { version = "4.5", features = ["derive"] }
 crossterm = "0.28"
 unicode-width = "0.2"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
 
 [profile.release]
 opt-level = 3

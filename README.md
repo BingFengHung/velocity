@@ -2,7 +2,7 @@
 
 [English](README.md) | [繁體中文](README.zh-TW.md)
 
-**Velocity** is a blazingly fast, lightweight, and modern terminal file browser written in Rust. Features a two-pane layout, true-color theme, instant search filter, file-type syntax coloring, and Nerd Font icons.
+**Velocity** is a blazingly fast, lightweight, and modern terminal file browser written in Rust. Features a two-pane layout, true-color theme, instant search filter, file-type syntax coloring, 24-bit image previews, and Nerd Font icons.
 
 Designed as a high-velocity, zero-overhead file navigation tool for terminal power users, developers, and AI-assisted terminal workflows.
 
@@ -11,7 +11,8 @@ Designed as a high-velocity, zero-overhead file navigation tool for terminal pow
 ## ✨ Features
 
 - ⚡ **High Velocity & Zero Dependencies**: Written in pure Rust with native performance and instant sub-millisecond startup.
-- 🪟 **Two-Pane Layout**: Left pane for interactive directory tree navigation; right pane for instant real-time file and directory previews.
+- 🪟 **Two-Pane Layout**: Left pane for interactive directory tree navigation; right pane for instant real-time file, folder, and image previews.
+- 🖼️ **24-bit True Color Image Previews**: Built-in instant pixel-block thumbnail rendering for PNG, JPEG, GIF, WebP, BMP, and ICO without external dependencies.
 - 🎨 **True Color & Syntax Categorization**: 24-bit True Color theme with automatic syntax categorization for source code, configuration files, media, archives, and executables.
 - 🔎 **Instant Search & Filter**: Press `/` to start typing and filter files in real-time with instant matching.
 - 🔤 **Multiple Icon Themes**: Built-in support for **Nerd Font** icons, **Emoji** icons, and **ASCII** fallback mode.
