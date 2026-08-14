@@ -38,4 +38,12 @@ pub struct Cli {
     /// Show hidden files and directories (names starting with '.')
     #[arg(short = 'a', long = "all", default_value_t = false)]
     pub all: bool,
+
+    /// Check for updates and automatically upgrade to the latest release
+    #[arg(short = 'u', long = "update", default_value_t = false)]
+    pub update: bool,
+
+    /// Check if a newer version of Velocity is available without upgrading
+    #[arg(long = "check-update", default_value_t = false)]
+    pub check_update: bool,
 }

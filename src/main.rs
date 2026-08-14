@@ -9,6 +9,7 @@ mod icons;
 mod syntax;
 mod theme;
 mod tui;
+mod update;
 
 use app::App;
 use clap::Parser;
@@ -38,6 +39,16 @@ fn setup_panic_hook() {
 
 fn main() -> io::Result<()> {
     let args = Cli::parse();
+
+    // Handle update commands
+    if args.update || args.check_update {
+        if let Err(e) = update::check_and_update(args.check_update) {
+            eprintln!("❌ 更新失敗: {}", e);
+            std::process::exit(1);
+        }
+        return Ok(());
+    }
+
     setup_panic_hook();
 
     let initial_path = args

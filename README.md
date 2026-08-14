@@ -2,7 +2,7 @@
 
 [English](README.md) | [繁體中文](README.zh-TW.md)
 
-**Velocity** is a blazingly fast, lightweight, and modern terminal file browser written in Rust. Features a two-pane layout, true-color syntax highlighting, instant fuzzy search, Git status integration, 24-bit image & archive previews, and Nerd Font icons.
+**Velocity** is a blazingly fast, lightweight, and modern terminal file browser written in Rust. Features a two-pane layout, true-color syntax highlighting, instant fuzzy search, Git status integration, 24-bit image & archive previews, one-click self-updating, and Nerd Font icons.
 
 Designed as a high-velocity, zero-overhead file navigation and management tool for terminal power users, developers, and AI-assisted pair-programming workflows.
 
@@ -11,6 +11,7 @@ Designed as a high-velocity, zero-overhead file navigation and management tool f
 ## ✨ Features
 
 - ⚡ **High Velocity & Zero Dependencies**: Written in pure Rust with native performance and sub-millisecond startup time.
+- 🔄 **One-Command Self Update**: Run `velocity --update` to automatically detect, download, and install the latest release directly from GitHub.
 - 🪟 **Two-Pane Layout**: Left pane for interactive directory navigation; right pane for real-time previews.
 - 🌈 **True-Color Syntax Highlighting**: Built-in syntax highlighting engine for Rust, Python, JavaScript/TypeScript, Go, C/C++, JSON, TOML, YAML, Markdown, HTML, CSS, Shell, and SQL.
 - 🖼️ **24-bit True Color Image Previews**: Instant pixel-block thumbnail rendering for PNG, JPEG, GIF, WebP, BMP, and ICO directly in your terminal.
@@ -30,15 +31,23 @@ Designed as a high-velocity, zero-overhead file navigation and management tool f
 
 ---
 
-## 📦 Installation
+## 📦 Installation & Auto Update
 
 ### Pre-built Binaries
 
 Download pre-compiled release binaries for your operating system from GitHub Releases.
 
-### Building via GitHub Actions
+### Automatic Self-Update
 
-This repository adheres to the **Zero Local Heavy Compilation** rule. All release binaries across multiple targets (Windows, Linux, macOS) are automatically compiled and published through GitHub Actions CI/CD workflows upon pushing release tags (`v*.*.*`).
+Once installed, simply run:
+```bash
+# Check and automatically upgrade to the latest release
+velocity --update
+velocity -u
+
+# Check for new versions without upgrading
+velocity --check-update
+```
 
 ---
 
@@ -102,10 +111,12 @@ Arguments:
   [PATH]  Starting directory path [default: current working directory]
 
 Options:
-  -i, --icons <ICONS>  Icon display style [default: nerd] [possible values: nerd, emoji, ascii]
-  -a, --all            Show hidden files and directories (names starting with '.')
-  -h, --help           Print help
-  -V, --version        Print version
+  -i, --icons <ICONS>   Icon display style [default: nerd] [possible values: nerd, emoji, ascii]
+  -a, --all             Show hidden files and directories (names starting with '.')
+  -u, --update          Check for updates and automatically upgrade to the latest release
+      --check-update    Check if a newer version of Velocity is available without upgrading
+  -h, --help            Print help
+  -V, --version         Print version
 ```
 
 ---
