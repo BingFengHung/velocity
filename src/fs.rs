@@ -58,17 +58,80 @@ pub enum PreviewContent {
 }
 
 const TEXT_EXTENSIONS: &[&str] = &[
-    "txt", "md", "markdown", "ps1", "psm1", "psd1", "json", "xml", "yml", "yaml", "csv",
-    "log", "ini", "cfg", "conf", "py", "js", "ts", "tsx", "jsx", "html", "htm", "css", "scss",
-    "sass", "less", "cs", "java", "go", "rs", "rb", "php", "c", "h", "cpp", "hpp", "cc", "cxx",
-    "sql", "sh", "bash", "zsh", "bat", "cmd", "toml", "env", "gitignore", "dockerfile", "tf",
-    "tsv", "properties", "vue", "svelte", "swift", "kt", "kts", "dart", "lua", "r", "scala",
-    "zig", "v", "nim", "odin", "graphql", "proto", "rst", "tex", "bib", "diff", "patch",
+    "txt",
+    "md",
+    "markdown",
+    "ps1",
+    "psm1",
+    "psd1",
+    "json",
+    "xml",
+    "yml",
+    "yaml",
+    "csv",
+    "log",
+    "ini",
+    "cfg",
+    "conf",
+    "py",
+    "js",
+    "ts",
+    "tsx",
+    "jsx",
+    "html",
+    "htm",
+    "css",
+    "scss",
+    "sass",
+    "less",
+    "cs",
+    "java",
+    "go",
+    "rs",
+    "rb",
+    "php",
+    "c",
+    "h",
+    "cpp",
+    "hpp",
+    "cc",
+    "cxx",
+    "sql",
+    "sh",
+    "bash",
+    "zsh",
+    "bat",
+    "cmd",
+    "toml",
+    "env",
+    "gitignore",
+    "dockerfile",
+    "tf",
+    "tsv",
+    "properties",
+    "vue",
+    "svelte",
+    "swift",
+    "kt",
+    "kts",
+    "dart",
+    "lua",
+    "r",
+    "scala",
+    "zig",
+    "v",
+    "nim",
+    "odin",
+    "graphql",
+    "proto",
+    "rst",
+    "tex",
+    "bib",
+    "diff",
+    "patch",
 ];
 
-const IMAGE_EXTENSIONS: &[&str] = &[
-    "png", "jpg", "jpeg", "gif", "webp", "bmp", "ico",
-];
+const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico"];
 
 const ARCHIVE_EXTENSIONS: &[&str] = &["zip"];
 
@@ -447,10 +510,7 @@ pub fn open_in_editor(path: &Path) -> Result<(), String> {
         if !ed.trim().is_empty() {
             let parts: Vec<&str> = ed.split_whitespace().collect();
             if let Some((cmd, args)) = parts.split_first() {
-                let status = Command::new(cmd)
-                    .args(args)
-                    .arg(path)
-                    .status();
+                let status = Command::new(cmd).args(args).arg(path).status();
                 if status.is_ok() {
                     return Ok(());
                 }

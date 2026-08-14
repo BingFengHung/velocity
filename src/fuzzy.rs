@@ -40,7 +40,12 @@ pub fn fuzzy_match(pattern: &str, target: &str) -> Option<FuzzyMatch> {
                 score += 30; // Start of string
             } else {
                 let prev_char = target_chars[t_idx - 1];
-                if prev_char == '_' || prev_char == '-' || prev_char == '.' || prev_char == '/' || prev_char == ' ' {
+                if prev_char == '_'
+                    || prev_char == '-'
+                    || prev_char == '.'
+                    || prev_char == '/'
+                    || prev_char == ' '
+                {
                     score += 25;
                 } else if prev_char.is_lowercase() && target_chars[t_idx].is_uppercase() {
                     score += 20; // CamelCase boundary

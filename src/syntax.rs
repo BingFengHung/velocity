@@ -12,14 +12,46 @@ pub struct HighlightedLine {
     pub spans: Vec<HighlightSpan>,
 }
 
-const COLOR_KEYWORD: Color = Color::Rgb { r: 255, g: 120, b: 150 };
-const COLOR_TYPE: Color = Color::Rgb { r: 120, g: 210, b: 255 };
-const COLOR_FUNCTION: Color = Color::Rgb { r: 140, g: 230, b: 180 };
-const COLOR_STRING: Color = Color::Rgb { r: 240, g: 210, b: 130 };
-const COLOR_NUMBER: Color = Color::Rgb { r: 210, g: 160, b: 255 };
-const COLOR_COMMENT: Color = Color::Rgb { r: 110, g: 115, b: 135 };
-const COLOR_HEADING: Color = Color::Rgb { r: 120, g: 200, b: 255 };
-const COLOR_DEFAULT: Color = Color::Rgb { r: 220, g: 220, b: 230 };
+const COLOR_KEYWORD: Color = Color::Rgb {
+    r: 255,
+    g: 120,
+    b: 150,
+};
+const COLOR_TYPE: Color = Color::Rgb {
+    r: 120,
+    g: 210,
+    b: 255,
+};
+const COLOR_FUNCTION: Color = Color::Rgb {
+    r: 140,
+    g: 230,
+    b: 180,
+};
+const COLOR_STRING: Color = Color::Rgb {
+    r: 240,
+    g: 210,
+    b: 130,
+};
+const COLOR_NUMBER: Color = Color::Rgb {
+    r: 210,
+    g: 160,
+    b: 255,
+};
+const COLOR_COMMENT: Color = Color::Rgb {
+    r: 110,
+    g: 115,
+    b: 135,
+};
+const COLOR_HEADING: Color = Color::Rgb {
+    r: 120,
+    g: 200,
+    b: 255,
+};
+const COLOR_DEFAULT: Color = Color::Rgb {
+    r: 220,
+    g: 220,
+    b: 230,
+};
 
 pub fn highlight_line(line: &str, ext: &str) -> HighlightedLine {
     if line.trim().is_empty() {
@@ -58,15 +90,15 @@ fn highlight_rust(line: &str) -> HighlightedLine {
     highlight_generic_code(
         line,
         &[
-            "fn", "let", "mut", "pub", "struct", "enum", "impl", "trait", "type", "use",
-            "mod", "const", "static", "if", "else", "match", "for", "while", "loop", "return",
-            "break", "continue", "async", "await", "where", "move", "unsafe", "ref", "in",
-            "as", "dyn", "true", "false", "Some", "None", "Ok", "Err",
+            "fn", "let", "mut", "pub", "struct", "enum", "impl", "trait", "type", "use", "mod",
+            "const", "static", "if", "else", "match", "for", "while", "loop", "return", "break",
+            "continue", "async", "await", "where", "move", "unsafe", "ref", "in", "as", "dyn",
+            "true", "false", "Some", "None", "Ok", "Err",
         ],
         &[
-            "String", "str", "u8", "u16", "u32", "u64", "u128", "usize", "i8", "i16", "i32",
-            "i64", "i128", "isize", "f32", "f64", "bool", "char", "Vec", "Option", "Result",
-            "Box", "Rc", "Arc", "Self", "self",
+            "String", "str", "u8", "u16", "u32", "u64", "u128", "usize", "i8", "i16", "i32", "i64",
+            "i128", "isize", "f32", "f64", "bool", "char", "Vec", "Option", "Result", "Box", "Rc",
+            "Arc", "Self", "self",
         ],
         "//",
     )
@@ -80,14 +112,24 @@ fn highlight_python(line: &str) -> HighlightedLine {
     highlight_generic_code(
         line,
         &[
-            "def", "class", "import", "from", "as", "return", "if", "elif", "else", "for",
-            "while", "try", "except", "finally", "with", "yield", "lambda", "global", "nonlocal",
-            "pass", "break", "continue", "raise", "async", "await", "in", "is", "not", "and", "or",
-            "True", "False", "None", "self",
+            "def", "class", "import", "from", "as", "return", "if", "elif", "else", "for", "while",
+            "try", "except", "finally", "with", "yield", "lambda", "global", "nonlocal", "pass",
+            "break", "continue", "raise", "async", "await", "in", "is", "not", "and", "or", "True",
+            "False", "None", "self",
         ],
         &[
-            "int", "float", "str", "list", "dict", "set", "tuple", "bool", "bytes", "object",
-            "Exception", "type",
+            "int",
+            "float",
+            "str",
+            "list",
+            "dict",
+            "set",
+            "tuple",
+            "bool",
+            "bytes",
+            "object",
+            "Exception",
+            "type",
         ],
         "#",
     )
@@ -101,15 +143,52 @@ fn highlight_js(line: &str) -> HighlightedLine {
     highlight_generic_code(
         line,
         &[
-            "function", "const", "let", "var", "class", "interface", "type", "import", "export",
-            "from", "default", "return", "if", "else", "for", "while", "do", "switch", "case",
-            "break", "continue", "try", "catch", "finally", "throw", "new", "this", "super",
-            "extends", "implements", "async", "await", "yield", "typeof", "instanceof", "in", "of",
-            "true", "false", "null", "undefined", "NaN",
+            "function",
+            "const",
+            "let",
+            "var",
+            "class",
+            "interface",
+            "type",
+            "import",
+            "export",
+            "from",
+            "default",
+            "return",
+            "if",
+            "else",
+            "for",
+            "while",
+            "do",
+            "switch",
+            "case",
+            "break",
+            "continue",
+            "try",
+            "catch",
+            "finally",
+            "throw",
+            "new",
+            "this",
+            "super",
+            "extends",
+            "implements",
+            "async",
+            "await",
+            "yield",
+            "typeof",
+            "instanceof",
+            "in",
+            "of",
+            "true",
+            "false",
+            "null",
+            "undefined",
+            "NaN",
         ],
         &[
-            "string", "number", "boolean", "any", "void", "never", "unknown", "Promise",
-            "Array", "Object", "Map", "Set", "Record",
+            "string", "number", "boolean", "any", "void", "never", "unknown", "Promise", "Array",
+            "Object", "Map", "Set", "Record",
         ],
         "//",
     )
@@ -123,15 +202,44 @@ fn highlight_c_like(line: &str) -> HighlightedLine {
     highlight_generic_code(
         line,
         &[
-            "if", "else", "for", "while", "do", "switch", "case", "break", "continue", "return",
-            "struct", "class", "enum", "typedef", "public", "private", "protected", "static",
-            "const", "constexpr", "virtual", "override", "import", "package", "func", "go",
-            "chan", "defer", "true", "false", "nullptr", "nil", "NULL",
+            "if",
+            "else",
+            "for",
+            "while",
+            "do",
+            "switch",
+            "case",
+            "break",
+            "continue",
+            "return",
+            "struct",
+            "class",
+            "enum",
+            "typedef",
+            "public",
+            "private",
+            "protected",
+            "static",
+            "const",
+            "constexpr",
+            "virtual",
+            "override",
+            "import",
+            "package",
+            "func",
+            "go",
+            "chan",
+            "defer",
+            "true",
+            "false",
+            "nullptr",
+            "nil",
+            "NULL",
         ],
         &[
-            "int", "long", "short", "char", "float", "double", "void", "bool", "size_t",
-            "uint8_t", "uint16_t", "uint32_t", "uint64_t", "int8_t", "int16_t", "int32_t",
-            "int64_t", "string", "auto",
+            "int", "long", "short", "char", "float", "double", "void", "bool", "size_t", "uint8_t",
+            "uint16_t", "uint32_t", "uint64_t", "int8_t", "int16_t", "int32_t", "int64_t",
+            "string", "auto",
         ],
         "//",
     )
@@ -142,7 +250,9 @@ fn highlight_config(line: &str) -> HighlightedLine {
     if trimmed.starts_with('#') {
         return single_span(line, COLOR_COMMENT, false);
     }
-    if (trimmed.starts_with('[') && trimmed.ends_with(']')) || (trimmed.starts_with('{') && trimmed.ends_with('}')) {
+    if (trimmed.starts_with('[') && trimmed.ends_with(']'))
+        || (trimmed.starts_with('{') && trimmed.ends_with('}'))
+    {
         return single_span(line, COLOR_HEADING, true);
     }
 
@@ -154,7 +264,11 @@ fn highlight_config(line: &str) -> HighlightedLine {
             is_bold: true,
         });
         spans.push(HighlightSpan {
-            text: if line.contains(':') { ":".to_string() } else { " = ".to_string() },
+            text: if line.contains(':') {
+                ":".to_string()
+            } else {
+                " = ".to_string()
+            },
             color: COLOR_DEFAULT,
             is_bold: false,
         });

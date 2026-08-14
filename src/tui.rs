@@ -89,11 +89,7 @@ impl TerminalLayout {
     }
 }
 
-pub fn render_ui<W: Write>(
-    stdout: &mut W,
-    app: &App,
-    layout: &TerminalLayout,
-) -> io::Result<()> {
+pub fn render_ui<W: Write>(stdout: &mut W, app: &App, layout: &TerminalLayout) -> io::Result<()> {
     // 1. Top Title Bar (Path + Git Branch + Sort Mode)
     stdout.queue(MoveTo(0, 0))?;
     stdout.queue(SetBackgroundColor(THEME.title_bg))?;
@@ -132,7 +128,11 @@ pub fn render_ui<W: Write>(
     full_top_bar.push_str(&git_branch_str);
     full_top_bar.push_str(&sort_badge);
 
-    write!(stdout, "{}", fit_width(&full_top_bar, layout.width as usize))?;
+    write!(
+        stdout,
+        "{}",
+        fit_width(&full_top_bar, layout.width as usize)
+    )?;
     stdout.queue(ResetColor)?;
     stdout.queue(SetAttribute(Attribute::Reset))?;
 
@@ -164,11 +164,12 @@ pub fn render_ui<W: Write>(
     let items_badge = format!(" 檔案 ({}) ", app.filtered_items.len());
     write!(stdout, "{}", items_badge)?;
 
-    let selected_entry = if !app.filtered_items.is_empty() && app.selected < app.filtered_items.len() {
-        Some(&app.filtered_items[app.selected].entry)
-    } else {
-        None
-    };
+    let selected_entry =
+        if !app.filtered_items.is_empty() && app.selected < app.filtered_items.len() {
+            Some(&app.filtered_items[app.selected].entry)
+        } else {
+            None
+        };
 
     // Right Panel Header
     let right_title_max_w = layout.right_w.saturating_sub(4) as usize;
@@ -194,9 +195,8 @@ pub fn render_ui<W: Write>(
     // 3. Render Left List & Right Preview Lines
     let list_height = layout.inner_h as usize;
     let right_cell_w = layout.right_w.saturating_sub(3) as usize;
-    let preview_content = selected_entry.map(|e| {
-        read_preview(e, PREVIEW_MAX_LINES, PREVIEW_MAX_BYTES, right_cell_w)
-    });
+    let preview_content =
+        selected_entry.map(|e| read_preview(e, PREVIEW_MAX_LINES, PREVIEW_MAX_BYTES, right_cell_w));
 
     for row in 0..list_height {
         let y = layout.top + 1 + (row as u16);
@@ -326,7 +326,9 @@ pub fn render_ui<W: Write>(
                         img_info.format_name,
                         img_info.orig_width,
                         img_info.orig_height,
-                        selected_entry.map(|e| format_size(e.size)).unwrap_or_default()
+                        selected_entry
+                            .map(|e| format_size(e.size))
+                            .unwrap_or_default()
                     );
                     stdout.queue(SetForegroundColor(THEME.accent))?;
                     write!(stdout, "{}", fit_width(&info_line, right_cell_w))?;

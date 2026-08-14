@@ -209,7 +209,11 @@ impl App {
             {
                 use std::process::Command;
                 let _ = Command::new("powershell")
-                    .args(["-NoProfile", "-Command", &format!("Set-Clipboard -Value '{}'", path_str.replace('\'', "''"))])
+                    .args([
+                        "-NoProfile",
+                        "-Command",
+                        &format!("Set-Clipboard -Value '{}'", path_str.replace('\'', "''")),
+                    ])
                     .output();
             }
             self.set_status(format!("📋 已複製路徑: {}", path_str));
@@ -336,7 +340,9 @@ impl App {
                 }
             }
             KeyCode::Down | KeyCode::Char('j') => {
-                if !self.filtered_items.is_empty() && self.selected < self.filtered_items.len() - 1 {
+                if !self.filtered_items.is_empty()
+                    && self.selected < self.filtered_items.len() - 1
+                {
                     self.selected += 1;
                 }
             }
@@ -345,7 +351,8 @@ impl App {
             }
             KeyCode::PageDown => {
                 if !self.filtered_items.is_empty() {
-                    self.selected = (self.selected + list_height.max(1)).min(self.filtered_items.len() - 1);
+                    self.selected =
+                        (self.selected + list_height.max(1)).min(self.filtered_items.len() - 1);
                 }
             }
             KeyCode::Home => {

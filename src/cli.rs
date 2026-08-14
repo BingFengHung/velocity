@@ -4,11 +4,17 @@ use std::path::PathBuf;
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum IconStyle {
     #[default]
-    #[value(name = "nerd", help = "Nerd Font icons (requires a Nerd Font installed)")]
+    #[value(
+        name = "nerd",
+        help = "Nerd Font icons (requires a Nerd Font installed)"
+    )]
     Nerd,
     #[value(name = "emoji", help = "Standard Unicode Emoji icons")]
     Emoji,
-    #[value(name = "ascii", help = "Plain ASCII indicators ([+] for dirs, spaces for files)")]
+    #[value(
+        name = "ascii",
+        help = "Plain ASCII indicators ([+] for dirs, spaces for files)"
+    )]
     Ascii,
 }
 
