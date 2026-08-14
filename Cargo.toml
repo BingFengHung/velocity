@@ -1,0 +1,23 @@
+[package]
+name = "velocity"
+version = "0.1.0"
+edition = "2021"
+authors = ["Velocity Developers"]
+description = "A blazingly fast, modern terminal file browser with two-pane layout, true-color theme, instant search, and Nerd Font icons."
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+keywords = ["velocity", "tui", "file-manager", "terminal", "file-browser"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+crossterm = "0.28"
+unicode-width = "0.2"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
