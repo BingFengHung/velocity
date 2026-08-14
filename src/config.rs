@@ -1,5 +1,34 @@
 use crossterm::style::Color;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum SortMode {
+    #[default]
+    Name,
+    Time,
+    Size,
+    Extension,
+}
+
+impl SortMode {
+    pub fn next(self) -> Self {
+        match self {
+            SortMode::Name => SortMode::Time,
+            SortMode::Time => SortMode::Size,
+            SortMode::Size => SortMode::Extension,
+            SortMode::Extension => SortMode::Name,
+        }
+    }
+
+    pub fn display_name(self) -> &'static str {
+        match self {
+            SortMode::Name => "名稱 (A-Z)",
+            SortMode::Time => "修改時間 ↓",
+            SortMode::Size => "檔案大小 ↓",
+            SortMode::Extension => "類型副檔名",
+        }
+    }
+}
+
 pub struct ThemeColors {
     pub bg: Color,
     pub panel: Color,
@@ -14,6 +43,12 @@ pub struct ThemeColors {
     pub accent: Color,
     pub search: Color,
     pub size: Color,
+    pub match_highlight: Color,
+    pub git_branch: Color,
+    pub git_modified: Color,
+    pub git_staged: Color,
+    pub git_untracked: Color,
+    pub git_deleted: Color,
 }
 
 pub const THEME: ThemeColors = ThemeColors {
@@ -30,6 +65,12 @@ pub const THEME: ThemeColors = ThemeColors {
     accent: Color::Rgb { r: 150, g: 220, b: 160 },
     search: Color::Rgb { r: 255, g: 214, b: 120 },
     size: Color::Rgb { r: 150, g: 152, b: 170 },
+    match_highlight: Color::Rgb { r: 255, g: 230, b: 90 },
+    git_branch: Color::Rgb { r: 200, g: 150, b: 255 },
+    git_modified: Color::Rgb { r: 255, g: 200, b: 80 },
+    git_staged: Color::Rgb { r: 130, g: 230, b: 140 },
+    git_untracked: Color::Rgb { r: 140, g: 190, b: 255 },
+    git_deleted: Color::Rgb { r: 255, g: 100, b: 100 },
 };
 
 pub const PREVIEW_MAX_BYTES: u64 = 256 * 1024; // 256 KB

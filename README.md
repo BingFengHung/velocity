@@ -2,23 +2,31 @@
 
 [English](README.md) | [繁體中文](README.zh-TW.md)
 
-**Velocity** is a blazingly fast, lightweight, and modern terminal file browser written in Rust. Features a two-pane layout, true-color theme, instant search filter, file-type syntax coloring, 24-bit image previews, and Nerd Font icons.
+**Velocity** is a blazingly fast, lightweight, and modern terminal file browser written in Rust. Features a two-pane layout, true-color syntax highlighting, instant fuzzy search, Git status integration, 24-bit image & archive previews, and Nerd Font icons.
 
-Designed as a high-velocity, zero-overhead file navigation tool for terminal power users, developers, and AI-assisted terminal workflows.
+Designed as a high-velocity, zero-overhead file navigation and management tool for terminal power users, developers, and AI-assisted pair-programming workflows.
 
 ---
 
 ## ✨ Features
 
-- ⚡ **High Velocity & Zero Dependencies**: Written in pure Rust with native performance and instant sub-millisecond startup.
-- 🪟 **Two-Pane Layout**: Left pane for interactive directory tree navigation; right pane for instant real-time file, folder, and image previews.
-- 🖼️ **24-bit True Color Image Previews**: Built-in instant pixel-block thumbnail rendering for PNG, JPEG, GIF, WebP, BMP, and ICO without external dependencies.
-- 🎨 **True Color & Syntax Categorization**: 24-bit True Color theme with automatic syntax categorization for source code, configuration files, media, archives, and executables.
-- 🔎 **Instant Search & Filter**: Press `/` to start typing and filter files in real-time with instant matching.
+- ⚡ **High Velocity & Zero Dependencies**: Written in pure Rust with native performance and sub-millisecond startup time.
+- 🪟 **Two-Pane Layout**: Left pane for interactive directory navigation; right pane for real-time previews.
+- 🌈 **True-Color Syntax Highlighting**: Built-in syntax highlighting engine for Rust, Python, JavaScript/TypeScript, Go, C/C++, JSON, TOML, YAML, Markdown, HTML, CSS, Shell, and SQL.
+- 🖼️ **24-bit True Color Image Previews**: Instant pixel-block thumbnail rendering for PNG, JPEG, GIF, WebP, BMP, and ICO directly in your terminal.
+- 📦 **Instant Archive Inspection**: Peek inside `.zip` files to view directory structures and uncompressed sizes without extraction.
+- 🌿 **Git Status & Branch Integration**: Live Git branch display and inline file status badges (`M` modified, `+` staged, `?` untracked, `D` deleted).
+- 🔍 **Fzf-like Intelligent Fuzzy Search**: Press `/` for instant fuzzy subsequence matching with character highlights and ranking.
+- 🔄 **Multi-Dimensional Sorting**: Press `s` to cycle sorting by Name (A-Z), Modification Time (newest first), File Size (largest first), or Extension.
+- 🛠️ **Lightweight File Operations**:
+  - `y`: Copy absolute file path to clipboard.
+  - `a`: Create new file (or directory ending with `/`).
+  - `c`: Rename selected item.
+  - `d`: Delete item (with confirmation prompt).
 - 🔤 **Multiple Icon Themes**: Built-in support for **Nerd Font** icons, **Emoji** icons, and **ASCII** fallback mode.
-- 🌐 **Accurate CJK & Unicode Width Handling**: Fully prevents terminal box border misalignment caused by East Asian wide characters or emojis.
-- 📝 **Seamless Editor Integration**: Press `e` to open the highlighted file directly in your `$EDITOR`, VS Code, or system default text editor.
-- 🌍 **Cross-Platform**: First-class support for Windows, Linux, and macOS.
+- 🌐 **Accurate CJK & Unicode Width**: Prevents terminal box border misalignment caused by East Asian wide characters or emojis.
+- 📝 **Editor Integration**: Press `e` to open the highlighted file in `$EDITOR`, VS Code, or system default text editor.
+- 🌍 **Cross-Platform**: Windows, Linux, and macOS.
 
 ---
 
@@ -72,9 +80,14 @@ velocity -a
 | `Home` `End` | Jump to top / bottom |
 | `→` / `l` / `Enter` | Enter highlighted directory |
 | `←` / `h` / `Backspace` | Go back to parent directory (cursor remembers previous folder) |
-| `/` | Instant search / filter mode (`Enter` to confirm, `Esc` to cancel) |
+| `/` | Instant fuzzy search / filter mode (`Enter` to confirm, `Esc` to cancel) |
+| `s` / `o` | Cycle sorting mode (Name → Time → Size → Extension) |
+| `y` | Copy absolute file path to system clipboard |
+| `a` / `n` | Create new file or folder (append `/` for folder) |
+| `c` | Rename selected file or folder |
+| `d` | Delete selected item (with confirmation prompt) |
 | `e` | Open selected file in `$EDITOR` / VS Code / default editor |
-| `r` | Refresh current directory |
+| `r` | Refresh directory & Git status |
 | `.` | Toggle show/hide hidden files |
 | `q` / `Esc` | Quit Velocity |
 

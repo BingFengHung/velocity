@@ -1,3 +1,6 @@
+use crate::archive::{read_zip_preview, ArchivePreviewInfo};
+use crate::config::SortMode;
+use crate::syntax::{highlight_line, HighlightedLine};
 use chrono::{DateTime, Local};
 use image::{imageops::FilterType, DynamicImage, GenericImageView, ImageReader};
 use std::fs::{self, File};
@@ -38,11 +41,12 @@ pub enum PreviewContent {
         items: Vec<String>,
     },
     Text {
-        lines: Vec<String>,
+        lines: Vec<HighlightedLine>,
         total_lines: usize,
         truncated: bool,
     },
     Image(ImagePreviewInfo),
+    Archive(ArchivePreviewInfo),
     Binary {
         size: u64,
     },
@@ -66,7 +70,13 @@ const IMAGE_EXTENSIONS: &[&str] = &[
     "png", "jpg", "jpeg", "gif", "webp", "bmp", "ico",
 ];
 
-pub fn read_directory(path: &Path, show_hidden: bool) -> io::Result<Vec<FileEntry>> {
+const ARCHIVE_EXTENSIONS: &[&str] = &["zip"];
+
+pub fn read_directory(
+    path: &Path,
+    show_hidden: bool,
+    sort_mode: SortMode,
+) -> io::Result<Vec<FileEntry>> {
     let mut entries = Vec::new();
     let read_dir = fs::read_dir(path)?;
 
@@ -110,16 +120,37 @@ pub fn read_directory(path: &Path, show_hidden: bool) -> io::Result<Vec<FileEntr
         });
     }
 
-    // Sort: directories first, then alphabetical (case-insensitive)
+    sort_entries(&mut entries, sort_mode);
+    Ok(entries)
+}
+
+pub fn sort_entries(entries: &mut [FileEntry], sort_mode: SortMode) {
     entries.sort_by(|a, b| {
+        // Directories always stay first
         match (a.is_dir, b.is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+            (true, false) => return std::cmp::Ordering::Less,
+            (false, true) => return std::cmp::Ordering::Greater,
+            _ => {}
+        }
+
+        match sort_mode {
+            SortMode::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+            SortMode::Time => {
+                let time_a = a.modified.unwrap_or(SystemTime::UNIX_EPOCH);
+                let time_b = b.modified.unwrap_or(SystemTime::UNIX_EPOCH);
+                time_b.cmp(&time_a) // Newest first
+            }
+            SortMode::Size => b.size.cmp(&a.size), // Largest first
+            SortMode::Extension => {
+                let ext_cmp = a.extension.cmp(&b.extension);
+                if ext_cmp.is_eq() {
+                    a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                } else {
+                    ext_cmp
+                }
+            }
         }
     });
-
-    Ok(entries)
 }
 
 pub fn is_text_file(path: &Path, ext: &str, size: u64) -> bool {
@@ -131,7 +162,7 @@ pub fn is_text_file(path: &Path, ext: &str, size: u64) -> bool {
         return true;
     }
 
-    if IMAGE_EXTENSIONS.contains(&ext) {
+    if IMAGE_EXTENSIONS.contains(&ext) || ARCHIVE_EXTENSIONS.contains(&ext) {
         return false;
     }
 
@@ -151,7 +182,6 @@ pub fn is_text_file(path: &Path, ext: &str, size: u64) -> bool {
             if std::str::from_utf8(slice).is_ok() {
                 return true;
             }
-            // If invalid UTF-8, check if mostly printable ASCII/whitespace
             let printable = slice
                 .iter()
                 .filter(|&&b| b == b'\t' || b == b'\n' || b == b'\r' || (32..=126).contains(&b))
@@ -195,19 +225,15 @@ pub fn load_image_preview(path: &Path, max_w: usize, max_h: usize) -> Option<Ima
         return None;
     }
 
-    // Terminal characters have ~2:1 height/width ratio.
-    // Since each character cell displays 2 vertical pixels (via \u{2580}),
-    // the target pixel canvas is max_w (columns) by max_h * 2 (pixel rows).
     let target_pixel_w = max_w as u32;
     let target_pixel_h = (max_h * 2) as u32;
 
-    // Calculate aspect ratio preserving thumbnail
     let thumb = dynamic_img.resize(target_pixel_w, target_pixel_h, FilterType::Triangle);
     let rgba_img = thumb.to_rgba8();
     let (thumb_w, thumb_h) = rgba_img.dimensions();
 
     let mut grid = Vec::new();
-    let panel_bg = (30, 30, 38); // Panel background color for alpha blending
+    let panel_bg = (30, 30, 38);
 
     let row_count = (thumb_h as usize + 1) / 2;
     for row in 0..row_count {
@@ -257,7 +283,7 @@ pub fn read_preview(
     avail_width: usize,
 ) -> PreviewContent {
     if entry.is_dir {
-        match read_directory(&entry.path, true) {
+        match read_directory(&entry.path, true, SortMode::Name) {
             Ok(sub_items) => {
                 let total_items = sub_items.len();
                 let preview_items = sub_items
@@ -280,7 +306,15 @@ pub fn read_preview(
             return PreviewContent::Empty;
         }
 
-        // Check for image preview
+        // 1. Check for archive preview (ZIP)
+        if ARCHIVE_EXTENSIONS.contains(&entry.extension.as_str()) {
+            match read_zip_preview(&entry.path, max_lines.saturating_sub(2)) {
+                Ok(info) => return PreviewContent::Archive(info),
+                Err(_) => {} // Fallback to binary
+            }
+        }
+
+        // 2. Check for image preview
         if IMAGE_EXTENSIONS.contains(&entry.extension.as_str()) {
             let img_max_h = max_lines.saturating_sub(2);
             let img_max_w = avail_width.saturating_sub(4);
@@ -309,13 +343,12 @@ pub fn read_preview(
                         Ok(l) => {
                             total_lines += 1;
                             if lines.len() < max_lines {
-                                lines.push(l);
+                                lines.push(highlight_line(&l, &entry.extension));
                             } else {
                                 truncated = true;
                             }
                         }
                         Err(_) => {
-                            // If encoding error occurs during line reading
                             if lines.is_empty() {
                                 return PreviewContent::Binary { size: entry.size };
                             }
@@ -337,6 +370,46 @@ pub fn read_preview(
             Err(e) => PreviewContent::Error(format!("讀取失敗: {}", e)),
         }
     }
+}
+
+pub fn create_file_or_dir(current_dir: &Path, name: &str) -> io::Result<()> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Ok(());
+    }
+
+    if name.ends_with('/') || name.ends_with('\\') {
+        let dir_path = current_dir.join(name.trim_end_matches(['/', '\\']));
+        fs::create_dir_all(dir_path)?;
+    } else {
+        let file_path = current_dir.join(name);
+        if let Some(parent) = file_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        File::create(file_path)?;
+    }
+    Ok(())
+}
+
+pub fn rename_entry(entry_path: &Path, new_name: &str) -> io::Result<()> {
+    let new_name = new_name.trim();
+    if new_name.is_empty() {
+        return Ok(());
+    }
+    if let Some(parent) = entry_path.parent() {
+        let new_path = parent.join(new_name);
+        fs::rename(entry_path, new_path)?;
+    }
+    Ok(())
+}
+
+pub fn delete_entry(entry_path: &Path, is_dir: bool) -> io::Result<()> {
+    if is_dir {
+        fs::remove_dir_all(entry_path)?;
+    } else {
+        fs::remove_file(entry_path)?;
+    }
+    Ok(())
 }
 
 pub fn format_size(bytes: u64) -> String {
@@ -387,7 +460,6 @@ pub fn open_in_editor(path: &Path) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        // Try VS Code first, then Notepad
         if Command::new("cmd")
             .args(["/C", "code", path.to_str().unwrap_or_default()])
             .spawn()

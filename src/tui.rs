@@ -1,6 +1,8 @@
+use crate::app::{App, FilteredEntry, InputMode};
 use crate::cli::IconStyle;
 use crate::config::{PREVIEW_MAX_BYTES, PREVIEW_MAX_LINES, THEME};
-use crate::fs::{format_size, format_time, read_preview, FileEntry, PreviewContent};
+use crate::fs::{format_size, format_time, read_preview, PreviewContent};
+use crate::git::GitFileStatus;
 use crate::icons::get_icon;
 use crate::theme::get_file_color;
 use crossterm::cursor::MoveTo;
@@ -9,9 +11,9 @@ use crossterm::style::{
 };
 use crossterm::QueueableCommand;
 use std::io::{self, Write};
+use std::time::Duration;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
-/// Fit a string to exact display width (in terminal columns), truncating or padding with spaces.
 pub fn fit_width(text: &str, target_width: usize) -> String {
     let mut current_width = 0;
     let mut result = String::with_capacity(target_width + 4);
@@ -25,7 +27,6 @@ pub fn fit_width(text: &str, target_width: usize) -> String {
             }
             current_width += space_needed;
         } else if ch.is_control() {
-            // Replace control characters with a space
             if current_width + 1 <= target_width {
                 result.push(' ');
                 current_width += 1;
@@ -44,7 +45,6 @@ pub fn fit_width(text: &str, target_width: usize) -> String {
         }
     }
 
-    // Pad remaining spaces if needed
     if current_width < target_width {
         let pad = target_width - current_width;
         for _ in 0..pad {
@@ -91,29 +91,48 @@ impl TerminalLayout {
 
 pub fn render_ui<W: Write>(
     stdout: &mut W,
-    current_dir: &str,
-    items: &[FileEntry],
-    selected: usize,
-    scroll: usize,
-    filter: &str,
-    is_searching: bool,
-    icon_style: IconStyle,
+    app: &App,
     layout: &TerminalLayout,
 ) -> io::Result<()> {
-    // 1. Top Title Bar
+    // 1. Top Title Bar (Path + Git Branch + Sort Mode)
     stdout.queue(MoveTo(0, 0))?;
     stdout.queue(SetBackgroundColor(THEME.title_bg))?;
     stdout.queue(SetForegroundColor(THEME.title))?;
     stdout.queue(SetAttribute(Attribute::Bold))?;
 
-    let folder_icon = match icon_style {
+    let folder_icon = match app.icon_style {
         IconStyle::Ascii => "[DIR]",
         IconStyle::Emoji => "📁",
         IconStyle::Nerd => "\u{f07c}",
     };
-    let title_text = format!("  {}  {}", folder_icon, current_dir);
-    let title_line = fit_width(&title_text, layout.width as usize);
-    write!(stdout, "{}", title_line)?;
+
+    let git_branch_str = if let Some(ref git) = app.git_info {
+        if let Some(ref branch) = git.branch {
+            format!("  {} ", branch)
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    let sort_badge = format!(" [排序: {}] ", app.sort_mode.display_name());
+    let path_str = app.current_dir.to_string_lossy();
+    let left_title = format!("  {}  {}", folder_icon, path_str);
+
+    let title_space = (layout.width as usize)
+        .saturating_sub(left_title.width())
+        .saturating_sub(git_branch_str.width())
+        .saturating_sub(sort_badge.width());
+
+    let mut full_top_bar = left_title;
+    if title_space > 0 {
+        full_top_bar.push_str(&" ".repeat(title_space));
+    }
+    full_top_bar.push_str(&git_branch_str);
+    full_top_bar.push_str(&sort_badge);
+
+    write!(stdout, "{}", fit_width(&full_top_bar, layout.width as usize))?;
     stdout.queue(ResetColor)?;
     stdout.queue(SetAttribute(Attribute::Reset))?;
 
@@ -121,7 +140,6 @@ pub fn render_ui<W: Write>(
     stdout.queue(SetForegroundColor(THEME.border))?;
     stdout.queue(SetBackgroundColor(THEME.bg))?;
 
-    // Top Border
     let left_bar_len = (layout.left_w.saturating_sub(1)) as usize;
     let right_bar_len = (layout.right_w.saturating_sub(2)) as usize;
     let top_border = format!(
@@ -132,7 +150,6 @@ pub fn render_ui<W: Write>(
     stdout.queue(MoveTo(0, layout.top))?;
     write!(stdout, "{}", top_border)?;
 
-    // Bottom Border
     let bottom_border = format!(
         "└{}┴{}┘",
         "─".repeat(left_bar_len),
@@ -144,16 +161,16 @@ pub fn render_ui<W: Write>(
     // Left Panel Header (Items Count)
     stdout.queue(MoveTo(2, layout.top))?;
     stdout.queue(SetForegroundColor(THEME.accent))?;
-    let items_badge = format!(" 檔案 ({}) ", items.len());
+    let items_badge = format!(" 檔案 ({}) ", app.filtered_items.len());
     write!(stdout, "{}", items_badge)?;
 
-    let selected_entry = if !items.is_empty() && selected < items.len() {
-        Some(&items[selected])
+    let selected_entry = if !app.filtered_items.is_empty() && app.selected < app.filtered_items.len() {
+        Some(&app.filtered_items[app.selected].entry)
     } else {
         None
     };
 
-    // Right Panel Header (Selected item details)
+    // Right Panel Header
     let right_title_max_w = layout.right_w.saturating_sub(4) as usize;
     if let Some(entry) = selected_entry {
         stdout.queue(MoveTo(layout.right_x + 2, layout.top))?;
@@ -184,7 +201,7 @@ pub fn render_ui<W: Write>(
     for row in 0..list_height {
         let y = layout.top + 1 + (row as u16);
 
-        // Render Vertical Borders
+        // Vertical Borders
         stdout.queue(MoveTo(0, y))?;
         stdout.queue(SetForegroundColor(THEME.border))?;
         write!(stdout, "│")?;
@@ -195,51 +212,108 @@ pub fn render_ui<W: Write>(
         stdout.queue(MoveTo(layout.width.saturating_sub(1), y))?;
         write!(stdout, "│")?;
 
-        // Render Left File List Cell
-        let item_idx = scroll + row;
+        // Left File List Cell
+        let item_idx = app.scroll + row;
         let left_cell_w = layout.left_w.saturating_sub(2) as usize;
 
         stdout.queue(MoveTo(1, y))?;
-        if item_idx < items.len() {
-            let item = &items[item_idx];
-            let is_cur = item_idx == selected;
+        if item_idx < app.filtered_items.len() {
+            let filtered_item = &app.filtered_items[item_idx];
+            let item = &filtered_item.entry;
+            let is_cur = item_idx == app.selected;
 
-            let icon = get_icon(item.is_dir, &item.extension, icon_style);
+            let icon = get_icon(item.is_dir, &item.extension, app.icon_style);
             let size_str = if item.is_dir {
                 String::new()
             } else {
                 format_size(item.size)
             };
 
-            let name_avail_w = left_cell_w.saturating_sub(3).saturating_sub(7);
+            let git_tag = match filtered_item.git_status {
+                Some(GitFileStatus::Modified) => " M",
+                Some(GitFileStatus::Staged) => " +",
+                Some(GitFileStatus::Untracked) => " ?",
+                Some(GitFileStatus::Deleted) => " D",
+                _ => "  ",
+            };
+
+            let name_avail_w = left_cell_w.saturating_sub(5).saturating_sub(7);
             let name_str = fit_width(&item.name, name_avail_w);
             let size_pad = format!("{:>6}", size_str);
-
-            let row_line = format!(" {} {} {}", icon, name_str, size_pad);
-            let final_left_line = fit_width(&row_line, left_cell_w);
 
             if is_cur {
                 stdout.queue(SetBackgroundColor(THEME.sel_bg))?;
                 stdout.queue(SetForegroundColor(THEME.sel_fg))?;
                 stdout.queue(SetAttribute(Attribute::Bold))?;
-                write!(stdout, "{}", final_left_line)?;
+                let full_row_str = format!("{} {} {} {}", git_tag, icon, name_str, size_pad);
+                write!(stdout, "{}", fit_width(&full_row_str, left_cell_w))?;
                 stdout.queue(SetAttribute(Attribute::Reset))?;
             } else {
+                stdout.queue(SetBackgroundColor(THEME.panel))?;
+
+                // Git status badge with color
+                let git_color = match filtered_item.git_status {
+                    Some(GitFileStatus::Modified) => THEME.git_modified,
+                    Some(GitFileStatus::Staged) => THEME.git_staged,
+                    Some(GitFileStatus::Untracked) => THEME.git_untracked,
+                    Some(GitFileStatus::Deleted) => THEME.git_deleted,
+                    _ => THEME.muted,
+                };
+                stdout.queue(SetForegroundColor(git_color))?;
+                write!(stdout, "{}", git_tag)?;
+
+                // Icon & Name
                 let fg_color = if item.is_dir {
                     THEME.dir
                 } else {
                     get_file_color(&item.extension)
                 };
-                stdout.queue(SetBackgroundColor(THEME.panel))?;
+
                 stdout.queue(SetForegroundColor(fg_color))?;
-                write!(stdout, "{}", final_left_line)?;
+                write!(stdout, " {} ", icon)?;
+
+                // If fuzzy match exists, render matched characters with highlight
+                if let Some(ref fuzzy) = filtered_item.fuzzy {
+                    let mut rendered_name_w = 0;
+                    for (ch_idx, ch) in item.name.chars().enumerate() {
+                        let ch_w = ch.width().unwrap_or(0);
+                        if rendered_name_w + ch_w > name_avail_w {
+                            break;
+                        }
+                        if fuzzy.matched_indices.contains(&ch_idx) {
+                            stdout.queue(SetForegroundColor(THEME.match_highlight))?;
+                            stdout.queue(SetAttribute(Attribute::Bold))?;
+                            write!(stdout, "{}", ch)?;
+                            stdout.queue(SetAttribute(Attribute::Reset))?;
+                            stdout.queue(SetBackgroundColor(THEME.panel))?;
+                            stdout.queue(SetForegroundColor(fg_color))?;
+                        } else {
+                            write!(stdout, "{}", ch)?;
+                        }
+                        rendered_name_w += ch_w;
+                    }
+                    if rendered_name_w < name_avail_w {
+                        write!(stdout, "{}", " ".repeat(name_avail_w - rendered_name_w))?;
+                    }
+                } else {
+                    write!(stdout, "{}", name_str)?;
+                }
+
+                // Size
+                stdout.queue(SetForegroundColor(THEME.size))?;
+                write!(stdout, " {}", size_pad)?;
+
+                let used_w = 2 + 1 + 1 + 1 + name_avail_w + 1 + 6;
+                if used_w < left_cell_w {
+                    write!(stdout, "{}", " ".repeat(left_cell_w - used_w))?;
+                }
             }
         } else {
             stdout.queue(SetBackgroundColor(THEME.panel))?;
             write!(stdout, "{}", " ".repeat(left_cell_w))?;
         }
 
-        // Render Right Preview Cell
+        // Right Preview Cell
         stdout.queue(MoveTo(layout.right_x + 1, y))?;
         stdout.queue(SetBackgroundColor(THEME.panel))?;
         stdout.queue(SetForegroundColor(THEME.file))?;
@@ -263,7 +337,7 @@ pub fn render_ui<W: Write>(
                     if img_row < img_info.grid.len() {
                         let cells = &img_info.grid[img_row];
                         let rendered_cols = cells.len().min(right_cell_w);
-                        write!(stdout, " ")?; // 1 column left padding
+                        write!(stdout, " ")?;
                         for cell in &cells[..rendered_cols.saturating_sub(1)] {
                             stdout.queue(SetForegroundColor(Color::Rgb {
                                 r: cell.top.0,
@@ -288,6 +362,27 @@ pub fn render_ui<W: Write>(
                     }
                 }
             }
+            Some(PreviewContent::Archive(arch_info)) => {
+                if row == 0 {
+                    let info_line = format!(
+                        " 📦 ZIP 壓縮包 · 包含 {} 個項目 · 解壓總計: {}",
+                        arch_info.total_files,
+                        format_size(arch_info.uncompressed_size)
+                    );
+                    stdout.queue(SetForegroundColor(THEME.accent))?;
+                    write!(stdout, "{}", fit_width(&info_line, right_cell_w))?;
+                } else if row == 1 {
+                    write!(stdout, "{}", " ".repeat(right_cell_w))?;
+                } else {
+                    let item_idx = row - 2;
+                    let line_text = if item_idx < arch_info.items.len() {
+                        format!("   {}", arch_info.items[item_idx])
+                    } else {
+                        String::new()
+                    };
+                    write!(stdout, "{}", fit_width(&line_text, right_cell_w))?;
+                }
+            }
             Some(PreviewContent::Directory {
                 items: sub_items,
                 total_items,
@@ -307,12 +402,33 @@ pub fn render_ui<W: Write>(
                 write!(stdout, "{}", fit_width(&line_text, right_cell_w))?;
             }
             Some(PreviewContent::Text { lines, .. }) => {
-                let line_text = if row < lines.len() {
-                    format!(" {}", lines[row])
+                if row < lines.len() {
+                    let h_line = &lines[row];
+                    write!(stdout, " ")?;
+                    let mut rendered_w = 1;
+                    for span in &h_line.spans {
+                        if rendered_w >= right_cell_w {
+                            break;
+                        }
+                        stdout.queue(SetForegroundColor(span.color))?;
+                        if span.is_bold {
+                            stdout.queue(SetAttribute(Attribute::Bold))?;
+                        }
+                        let avail = right_cell_w - rendered_w;
+                        let text_chunk = fit_width(&span.text, avail.min(span.text.width()));
+                        write!(stdout, "{}", text_chunk)?;
+                        rendered_w += text_chunk.width();
+                        if span.is_bold {
+                            stdout.queue(SetAttribute(Attribute::Reset))?;
+                            stdout.queue(SetBackgroundColor(THEME.panel))?;
+                        }
+                    }
+                    if rendered_w < right_cell_w {
+                        write!(stdout, "{}", " ".repeat(right_cell_w - rendered_w))?;
+                    }
                 } else {
-                    String::new()
-                };
-                write!(stdout, "{}", fit_width(&line_text, right_cell_w))?;
+                    write!(stdout, "{}", " ".repeat(right_cell_w))?;
+                }
             }
             Some(PreviewContent::Binary { size }) => {
                 let line_text = if row == 1 {
@@ -355,31 +471,76 @@ pub fn render_ui<W: Write>(
         }
     }
 
-    // 4. Bottom Status / Search Bar
+    // 4. Bottom Status / Interactive Bar
     let status_y = layout.height.saturating_sub(1);
     stdout.queue(MoveTo(0, status_y))?;
     stdout.queue(SetBackgroundColor(THEME.title_bg))?;
 
-    if is_searching {
-        stdout.queue(SetForegroundColor(THEME.search))?;
-        stdout.queue(SetAttribute(Attribute::Bold))?;
-        let search_text = format!("  / 搜尋: {}█   (Enter 定案 · Esc 取消)", filter);
-        write!(stdout, "{}", fit_width(&search_text, layout.width as usize))?;
-    } else {
-        stdout.queue(SetForegroundColor(THEME.muted))?;
-        let pos_str = if !items.is_empty() {
-            format!("{}/{}", selected + 1, items.len())
-        } else {
-            "0/0".to_string()
-        };
-        let filter_str = if !filter.is_empty() {
-            format!("  過濾: {}", filter)
-        } else {
-            String::new()
-        };
-        let shortcuts_str = "↑↓/kj 移動  →/l 進入  ←/h 上層  / 搜尋  e 編輯  r 整理  . 隱藏檔  q 離開";
-        let status_text = format!(" {} {}   {}", pos_str, filter_str, shortcuts_str);
-        write!(stdout, "{}", fit_width(&status_text, layout.width as usize))?;
+    match app.input_mode {
+        InputMode::Searching => {
+            stdout.queue(SetForegroundColor(THEME.search))?;
+            stdout.queue(SetAttribute(Attribute::Bold))?;
+            let search_text = format!("  / 模糊搜尋: {}█   (Enter 定案 · Esc 取消)", app.filter);
+            write!(stdout, "{}", fit_width(&search_text, layout.width as usize))?;
+        }
+        InputMode::Creating => {
+            stdout.queue(SetForegroundColor(THEME.accent))?;
+            stdout.queue(SetAttribute(Attribute::Bold))?;
+            let create_text = format!(
+                "  ✨ 新增檔案或目錄 (以 / 結尾建立目錄): {}█   (Enter 確認 · Esc 取消)",
+                app.input_buffer
+            );
+            write!(stdout, "{}", fit_width(&create_text, layout.width as usize))?;
+        }
+        InputMode::Renaming => {
+            stdout.queue(SetForegroundColor(THEME.search))?;
+            stdout.queue(SetAttribute(Attribute::Bold))?;
+            let rename_text = format!(
+                "  ✏️ 重新命名為: {}█   (Enter 確認 · Esc 取消)",
+                app.input_buffer
+            );
+            write!(stdout, "{}", fit_width(&rename_text, layout.width as usize))?;
+        }
+        InputMode::ConfirmDelete => {
+            stdout.queue(SetForegroundColor(THEME.git_deleted))?;
+            stdout.queue(SetAttribute(Attribute::Bold))?;
+            let sel_name = selected_entry.map(|e| e.name.as_str()).unwrap_or("");
+            let del_text = format!(
+                "  ⚠️ 確定要刪除「{}」嗎？  (y: 確認刪除 · n / Esc: 取消)",
+                sel_name
+            );
+            write!(stdout, "{}", fit_width(&del_text, layout.width as usize))?;
+        }
+        InputMode::Normal => {
+            // Check for temporary toast message (lasts 3 seconds)
+            if let Some((ref msg, instant)) = app.status_message {
+                if instant.elapsed() < Duration::from_secs(3) {
+                    stdout.queue(SetForegroundColor(THEME.accent))?;
+                    stdout.queue(SetAttribute(Attribute::Bold))?;
+                    let toast = format!("  {}", msg);
+                    write!(stdout, "{}", fit_width(&toast, layout.width as usize))?;
+                    stdout.queue(ResetColor)?;
+                    stdout.queue(SetAttribute(Attribute::Reset))?;
+                    stdout.flush()?;
+                    return Ok(());
+                }
+            }
+
+            stdout.queue(SetForegroundColor(THEME.muted))?;
+            let pos_str = if !app.filtered_items.is_empty() {
+                format!("{}/{}", app.selected + 1, app.filtered_items.len())
+            } else {
+                "0/0".to_string()
+            };
+            let filter_str = if !app.filter.is_empty() {
+                format!("  過濾: {}", app.filter)
+            } else {
+                String::new()
+            };
+            let shortcuts_str = "↑↓移動  →進入  ←上層  /搜尋  s排序  y複製路徑  a新增  c改名  d刪除  e編輯  .隱藏檔  q離開";
+            let status_text = format!(" {} {}   {}", pos_str, filter_str, shortcuts_str);
+            write!(stdout, "{}", fit_width(&status_text, layout.width as usize))?;
+        }
     }
 
     stdout.queue(ResetColor)?;

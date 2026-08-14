@@ -1,25 +1,50 @@
 use crate::cli::IconStyle;
-use crate::fs::{open_in_editor, read_directory, FileEntry};
+use crate::config::SortMode;
+use crate::fs::{
+    create_file_or_dir, delete_entry, open_in_editor, read_directory, rename_entry, FileEntry,
+};
+use crate::fuzzy::{fuzzy_match, FuzzyMatch};
+use crate::git::{get_git_status, GitFileStatus, GitRepoInfo};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::path::PathBuf;
+use std::time::Instant;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InputMode {
+    Normal,
+    Searching,
+    Creating,
+    Renaming,
+    ConfirmDelete,
+}
+
+#[derive(Clone, Debug)]
+pub struct FilteredEntry {
+    pub entry: FileEntry,
+    pub fuzzy: Option<FuzzyMatch>,
+    pub git_status: Option<GitFileStatus>,
+}
 
 pub struct App {
     pub current_dir: PathBuf,
     pub all_items: Vec<FileEntry>,
-    pub filtered_items: Vec<FileEntry>,
+    pub filtered_items: Vec<FilteredEntry>,
     pub selected: usize,
     pub scroll: usize,
     pub filter: String,
-    pub is_searching: bool,
+    pub input_buffer: String,
+    pub input_mode: InputMode,
+    pub sort_mode: SortMode,
     pub icon_style: IconStyle,
     pub show_hidden: bool,
     pub should_quit: bool,
+    pub git_info: Option<GitRepoInfo>,
+    pub status_message: Option<(String, Instant)>,
 }
 
 impl App {
     pub fn new(initial_path: PathBuf, icon_style: IconStyle, show_hidden: bool) -> Self {
-        let abs_path = std::fs::canonicalize(&initial_path)
-            .unwrap_or_else(|_| initial_path);
+        let abs_path = std::fs::canonicalize(&initial_path).unwrap_or_else(|_| initial_path);
 
         let mut app = Self {
             current_dir: abs_path,
@@ -28,18 +53,28 @@ impl App {
             selected: 0,
             scroll: 0,
             filter: String::new(),
-            is_searching: false,
+            input_buffer: String::new(),
+            input_mode: InputMode::Normal,
+            sort_mode: SortMode::Name,
             icon_style,
             show_hidden,
             should_quit: false,
+            git_info: None,
+            status_message: None,
         };
 
         app.reload_directory();
         app
     }
 
+    pub fn set_status(&mut self, msg: String) {
+        self.status_message = Some((msg, Instant::now()));
+    }
+
     pub fn reload_directory(&mut self) {
-        if let Ok(entries) = read_directory(&self.current_dir, self.show_hidden) {
+        self.git_info = get_git_status(&self.current_dir);
+
+        if let Ok(entries) = read_directory(&self.current_dir, self.show_hidden, self.sort_mode) {
             self.all_items = entries;
         } else {
             self.all_items = Vec::new();
@@ -49,15 +84,50 @@ impl App {
 
     pub fn apply_filter(&mut self) {
         if self.filter.is_empty() {
-            self.filtered_items = self.all_items.clone();
-        } else {
-            let lower_filter = self.filter.to_lowercase();
             self.filtered_items = self
                 .all_items
                 .iter()
-                .filter(|item| item.name.to_lowercase().contains(&lower_filter))
-                .cloned()
+                .map(|item| {
+                    let git_stat = self
+                        .git_info
+                        .as_ref()
+                        .and_then(|g| g.file_statuses.get(&item.path).copied());
+                    FilteredEntry {
+                        entry: item.clone(),
+                        fuzzy: None,
+                        git_status: git_stat,
+                    }
+                })
                 .collect();
+        } else {
+            let mut matches = Vec::new();
+            for item in &self.all_items {
+                if let Some(f_match) = fuzzy_match(&self.filter, &item.name) {
+                    let git_stat = self
+                        .git_info
+                        .as_ref()
+                        .and_then(|g| g.file_statuses.get(&item.path).copied());
+                    matches.push(FilteredEntry {
+                        entry: item.clone(),
+                        fuzzy: Some(f_match),
+                        git_status: git_stat,
+                    });
+                }
+            }
+
+            // Sort fuzzy matches by score (highest first, with directories prioritized)
+            matches.sort_by(|a, b| {
+                match (a.entry.is_dir, b.entry.is_dir) {
+                    (true, false) => return std::cmp::Ordering::Less,
+                    (false, true) => return std::cmp::Ordering::Greater,
+                    _ => {}
+                }
+                let score_a = a.fuzzy.as_ref().map(|f| f.score).unwrap_or(0);
+                let score_b = b.fuzzy.as_ref().map(|f| f.score).unwrap_or(0);
+                score_b.cmp(&score_a)
+            });
+
+            self.filtered_items = matches;
         }
 
         if self.filtered_items.is_empty() {
@@ -86,9 +156,9 @@ impl App {
     }
 
     pub fn enter_directory(&mut self) {
-        if let Some(entry) = self.filtered_items.get(self.selected) {
-            if entry.is_dir {
-                self.current_dir = entry.path.clone();
+        if let Some(item) = self.filtered_items.get(self.selected) {
+            if item.entry.is_dir {
+                self.current_dir = item.entry.path.clone();
                 self.filter.clear();
                 self.selected = 0;
                 self.scroll = 0;
@@ -108,9 +178,12 @@ impl App {
             self.filter.clear();
             self.reload_directory();
 
-            // Locate previously exited directory to keep cursor selection natural
             if let Some(prev_name) = previous_folder_name {
-                if let Some(idx) = self.filtered_items.iter().position(|e| e.name == prev_name) {
+                if let Some(idx) = self
+                    .filtered_items
+                    .iter()
+                    .position(|e| e.entry.name == prev_name)
+                {
                     self.selected = idx;
                 } else {
                     self.selected = 0;
@@ -122,43 +195,138 @@ impl App {
         }
     }
 
-    pub fn open_selected_in_editor(&self) {
-        if let Some(entry) = self.filtered_items.get(self.selected) {
-            if !entry.is_dir {
-                let _ = open_in_editor(&entry.path);
-            }
-        }
-    }
-
-    pub fn toggle_hidden(&mut self) {
-        self.show_hidden = !self.show_hidden;
+    pub fn cycle_sort_mode(&mut self) {
+        self.sort_mode = self.sort_mode.next();
+        self.set_status(format!("已切換排序方式: {}", self.sort_mode.display_name()));
         self.reload_directory();
     }
 
+    pub fn copy_selected_path(&mut self) {
+        if let Some(item) = self.filtered_items.get(self.selected) {
+            let path_str = item.entry.path.to_string_lossy().to_string();
+            // Copy to clipboard via OS command
+            #[cfg(target_os = "windows")]
+            {
+                use std::process::Command;
+                let _ = Command::new("powershell")
+                    .args(["-NoProfile", "-Command", &format!("Set-Clipboard -Value '{}'", path_str.replace('\'', "''"))])
+                    .output();
+            }
+            self.set_status(format!("📋 已複製路徑: {}", path_str));
+        }
+    }
+
     pub fn handle_key(&mut self, key: KeyEvent, list_height: usize) {
-        if self.is_searching {
-            match key.code {
-                KeyCode::Enter => {
-                    self.is_searching = false;
-                }
-                KeyCode::Esc => {
-                    self.is_searching = false;
-                    self.filter.clear();
-                    self.apply_filter();
-                }
-                KeyCode::Backspace => {
-                    self.filter.pop();
-                    self.apply_filter();
-                }
-                KeyCode::Char(c) => {
-                    if !key.modifiers.contains(KeyModifiers::CONTROL) && !key.modifiers.contains(KeyModifiers::ALT) {
-                        self.filter.push(c);
+        match self.input_mode {
+            InputMode::Searching => {
+                match key.code {
+                    KeyCode::Enter => {
+                        self.input_mode = InputMode::Normal;
+                    }
+                    KeyCode::Esc => {
+                        self.input_mode = InputMode::Normal;
+                        self.filter.clear();
                         self.apply_filter();
                     }
+                    KeyCode::Backspace => {
+                        self.filter.pop();
+                        self.apply_filter();
+                    }
+                    KeyCode::Char(c) => {
+                        if !key.modifiers.contains(KeyModifiers::CONTROL)
+                            && !key.modifiers.contains(KeyModifiers::ALT)
+                        {
+                            self.filter.push(c);
+                            self.apply_filter();
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
+                return;
             }
-            return;
+            InputMode::Creating => {
+                match key.code {
+                    KeyCode::Enter => {
+                        let name = self.input_buffer.trim().to_string();
+                        if !name.is_empty() {
+                            if let Err(e) = create_file_or_dir(&self.current_dir, &name) {
+                                self.set_status(format!("❌ 建立失敗: {}", e));
+                            } else {
+                                self.set_status(format!("✨ 成功建立: {}", name));
+                                self.reload_directory();
+                            }
+                        }
+                        self.input_mode = InputMode::Normal;
+                        self.input_buffer.clear();
+                    }
+                    KeyCode::Esc => {
+                        self.input_mode = InputMode::Normal;
+                        self.input_buffer.clear();
+                    }
+                    KeyCode::Backspace => {
+                        self.input_buffer.pop();
+                    }
+                    KeyCode::Char(c) => {
+                        self.input_buffer.push(c);
+                    }
+                    _ => {}
+                }
+                return;
+            }
+            InputMode::Renaming => {
+                match key.code {
+                    KeyCode::Enter => {
+                        let new_name = self.input_buffer.trim().to_string();
+                        if let Some(item) = self.filtered_items.get(self.selected) {
+                            if !new_name.is_empty() && new_name != item.entry.name {
+                                if let Err(e) = rename_entry(&item.entry.path, &new_name) {
+                                    self.set_status(format!("❌ 重命名失敗: {}", e));
+                                } else {
+                                    self.set_status(format!("✏️ 已重命名為: {}", new_name));
+                                    self.reload_directory();
+                                }
+                            }
+                        }
+                        self.input_mode = InputMode::Normal;
+                        self.input_buffer.clear();
+                    }
+                    KeyCode::Esc => {
+                        self.input_mode = InputMode::Normal;
+                        self.input_buffer.clear();
+                    }
+                    KeyCode::Backspace => {
+                        self.input_buffer.pop();
+                    }
+                    KeyCode::Char(c) => {
+                        self.input_buffer.push(c);
+                    }
+                    _ => {}
+                }
+                return;
+            }
+            InputMode::ConfirmDelete => {
+                match key.code {
+                    KeyCode::Char('y') | KeyCode::Char('Y') => {
+                        if let Some(item) = self.filtered_items.get(self.selected) {
+                            let name = item.entry.name.clone();
+                            if let Err(e) = delete_entry(&item.entry.path, item.entry.is_dir) {
+                                self.set_status(format!("❌ 刪除失敗: {}", e));
+                            } else {
+                                self.set_status(format!("🗑️ 已刪除: {}", name));
+                                self.reload_directory();
+                            }
+                        }
+                        self.input_mode = InputMode::Normal;
+                    }
+                    KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                        self.input_mode = InputMode::Normal;
+                        self.set_status("已取消刪除".to_string());
+                    }
+                    _ => {}
+                }
+                return;
+            }
+            InputMode::Normal => {}
         }
 
         match key.code {
@@ -195,18 +363,50 @@ impl App {
                 self.go_to_parent();
             }
             KeyCode::Char('/') => {
-                self.is_searching = true;
+                self.input_mode = InputMode::Searching;
                 self.filter.clear();
                 self.apply_filter();
             }
+            KeyCode::Char('s') | KeyCode::Char('S') | KeyCode::Char('o') => {
+                self.cycle_sort_mode();
+            }
+            KeyCode::Char('y') | KeyCode::Char('Y') => {
+                self.copy_selected_path();
+            }
+            KeyCode::Char('a') | KeyCode::Char('n') => {
+                self.input_mode = InputMode::Creating;
+                self.input_buffer.clear();
+            }
+            KeyCode::Char('c') | KeyCode::Char('C') => {
+                if let Some(item) = self.filtered_items.get(self.selected) {
+                    self.input_buffer = item.entry.name.clone();
+                    self.input_mode = InputMode::Renaming;
+                }
+            }
+            KeyCode::Char('d') | KeyCode::Char('D') => {
+                if !self.filtered_items.is_empty() {
+                    self.input_mode = InputMode::ConfirmDelete;
+                }
+            }
             KeyCode::Char('e') | KeyCode::Char('E') => {
-                self.open_selected_in_editor();
+                if let Some(item) = self.filtered_items.get(self.selected) {
+                    if !item.entry.is_dir {
+                        let _ = open_in_editor(&item.entry.path);
+                    }
+                }
             }
             KeyCode::Char('r') | KeyCode::Char('R') => {
                 self.reload_directory();
+                self.set_status("已重新整理目錄".to_string());
             }
             KeyCode::Char('.') => {
-                self.toggle_hidden();
+                self.show_hidden = !self.show_hidden;
+                self.set_status(if self.show_hidden {
+                    "已顯示隱藏檔案".to_string()
+                } else {
+                    "已隱藏點開頭檔案".to_string()
+                });
+                self.reload_directory();
             }
             KeyCode::Char('q') | KeyCode::Char('Q') => {
                 self.should_quit = true;

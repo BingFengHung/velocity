@@ -1,8 +1,12 @@
 mod app;
+mod archive;
 mod cli;
 mod config;
 mod fs;
+mod fuzzy;
+mod git;
 mod icons;
+mod syntax;
 mod theme;
 mod tui;
 
@@ -63,33 +67,20 @@ fn run_app<W: io::Write>(stdout: &mut W, app: &mut App) -> io::Result<()> {
 
         app.adjust_scroll(layout.inner_h as usize);
 
-        render_ui(
-            stdout,
-            &app.current_dir.to_string_lossy(),
-            &app.filtered_items,
-            app.selected,
-            app.scroll,
-            &app.filter,
-            app.is_searching,
-            app.icon_style,
-            &layout,
-        )?;
+        render_ui(stdout, app, &layout)?;
 
         if app.should_quit {
             break;
         }
 
-        if event::poll(Duration::from_millis(200))? {
+        if event::poll(Duration::from_millis(100))? {
             match event::read()? {
                 Event::Key(key_event) => {
-                    // Only process key press events to avoid double trigger on Windows/Linux
                     if key_event.kind == KeyEventKind::Press {
                         app.handle_key(key_event, layout.inner_h as usize);
                     }
                 }
-                Event::Resize(_, _) => {
-                    // Handled automatically on next iteration loop
-                }
+                Event::Resize(_, _) => {}
                 _ => {}
             }
         }
