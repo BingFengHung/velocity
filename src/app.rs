@@ -206,6 +206,16 @@ impl App {
         self.reload_directory();
     }
 
+    pub fn cycle_icon_style(&mut self) {
+        self.icon_style = self.icon_style.next();
+        let effective = crate::icons::resolve_icon_style(self.icon_style);
+        let desc = match self.icon_style {
+            IconStyle::Auto => format!("自動偵測 (當前生效: {})", effective.display_name()),
+            other => other.display_name().to_string(),
+        };
+        self.set_status(format!("已切換圖示樣式: {}", desc));
+    }
+
     pub fn copy_selected_path(&mut self) {
         if let Some(item) = self.filtered_items.get(self.selected) {
             let path_str = item.entry.path.to_string_lossy().to_string();
@@ -379,6 +389,9 @@ impl App {
             }
             KeyCode::Char('s') | KeyCode::Char('S') | KeyCode::Char('o') => {
                 self.cycle_sort_mode();
+            }
+            KeyCode::Char('i') | KeyCode::Char('I') => {
+                self.cycle_icon_style();
             }
             KeyCode::Char('y') | KeyCode::Char('Y') => {
                 self.copy_selected_path();

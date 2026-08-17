@@ -24,7 +24,7 @@ Designed as a high-velocity, zero-overhead file navigation and management tool f
   - `a`: Create new file (or directory ending with `/`).
   - `c`: Rename selected item.
   - `d`: Delete item (with confirmation prompt).
-- 🔤 **Multiple Icon Themes**: Built-in support for **Nerd Font** icons, **Emoji** icons, and **ASCII** fallback mode.
+- 🔤 **Smart Icon Detection & Fallback**: Automatically detects Nerd Font availability; seamlessly falls back to standard **Emoji** (or **ASCII**) in legacy terminals without broken question mark glyphs.
 - 🌐 **Accurate CJK & Unicode Width**: Prevents terminal box border misalignment caused by East Asian wide characters or emojis.
 - 📝 **Editor Integration**: Press `e` to open the highlighted file in `$EDITOR`, VS Code, or system default text editor.
 - 🌍 **Cross-Platform**: Windows, Linux, and macOS.
@@ -54,7 +54,7 @@ velocity --check-update
 ## 🚀 Quick Start
 
 ```bash
-# Launch Velocity in current working directory
+# Launch Velocity in current working directory (Auto-detects Nerd Font or Emoji)
 velocity
 
 # (Optional) Add alias 'vl' for maximum typing speed:
@@ -65,9 +65,13 @@ vl
 # Start browsing from a specific path
 velocity D:\projects\my_repo
 
-# Use Emoji icons (if no Nerd Font is installed)
+# Force Emoji icons
 velocity --icons emoji
 velocity -i emoji
+
+# Force Nerd Font icons
+velocity --icons nerd
+velocity -i nerd
 
 # Use ASCII fallback mode for maximum terminal compatibility
 velocity --icons ascii
@@ -91,6 +95,7 @@ velocity -a
 | `←` / `h` / `Backspace` | Go back to parent directory (cursor remembers previous folder) |
 | `/` | Instant fuzzy search / filter mode (`Enter` to confirm, `Esc` to cancel) |
 | `s` / `o` | Cycle sorting mode (Name → Time → Size → Extension) |
+| `i` | Cycle icon style (Auto → Emoji → Nerd Font → ASCII) |
 | `y` | Copy absolute file path to system clipboard |
 | `a` / `n` | Create new file or folder (append `/` for folder) |
 | `c` | Rename selected file or folder |
@@ -111,7 +116,7 @@ Arguments:
   [PATH]  Starting directory path [default: current working directory]
 
 Options:
-  -i, --icons <ICONS>   Icon display style [default: nerd] [possible values: nerd, emoji, ascii]
+  -i, --icons <ICONS>   Icon display style [default: auto] [possible values: auto, nerd, emoji, ascii]
   -a, --all             Show hidden files and directories (names starting with '.')
   -u, --update          Check for updates and automatically upgrade to the latest release
       --check-update    Check if a newer version of Velocity is available without upgrading

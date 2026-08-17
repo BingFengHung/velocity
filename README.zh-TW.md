@@ -24,7 +24,7 @@
   - `a` / `n`：新增檔案（輸入結尾為 `/` 則自動建立目錄）。
   - `c`：快速重新命名。
   - `d`：刪除選取項目（附確認提示防誤刪）。
-- 🔤 **多種圖示模式**：內建支援 **Nerd Font** 圖示、**Emoji** 圖示以及相容性最佳的 **ASCII** 模式。
+- 🔤 **智慧圖示自動偵測與降級**：預設自動檢測環境與系統是否安裝 Nerd Font，未安裝或在傳統 CMD 主控台時自動無縫降級為 **Emoji**（或 **ASCII**），徹底避免菱形問號缺字破版。
 - 🌐 **精確 CJK 與 Unicode 寬度計算**：避免繁體中文等寬字元造成終端邊框破版。
 - 📝 **文字編輯器整合**：按 `e` 即可直接以 `$EDITOR`、VS Code 或系統預設文字編輯器開啟檔案。
 - 🌍 **全平台相容**：完美支援 Windows、Linux 與 macOS。
@@ -54,7 +54,7 @@ velocity --check-update
 ## 🚀 快速上手
 
 ```bash
-# 從目前工作目錄啟動 Velocity
+# 從目前工作目錄啟動 Velocity（預設自動偵測 Nerd Font / Emoji）
 velocity
 
 # （推薦）設定終端別名 'vl' 享受極速輸入體驗：
@@ -65,9 +65,13 @@ vl
 # 指定瀏覽起點目錄
 velocity D:\projects\my_repo
 
-# 使用 Emoji 圖示（未安裝 Nerd Font 字型時適用）
+# 強制使用 Emoji 圖示
 velocity --icons emoji
 velocity -i emoji
+
+# 強制使用 Nerd Font 圖示
+velocity --icons nerd
+velocity -i nerd
 
 # 使用純 ASCII 相容模式
 velocity --icons ascii
@@ -91,6 +95,7 @@ velocity -a
 | `←` / `h` / `Backspace` | 回到上一層目錄（游標自動選取剛剛退出的目錄） |
 | `/` | 進入即時模糊搜尋過濾模式（`Enter` 定案、`Esc` 取消） |
 | `s` / `o` | 切換排序模式（名稱 → 修改時間 → 檔案大小 → 副檔名） |
+| `i` | 即時循環切換圖示模式（自動偵測 → Emoji → Nerd Font → ASCII） |
 | `y` | 複製選取項目的絕對路徑至剪貼簿 |
 | `a` / `n` | 新增檔案或資料夾（名稱以 `/` 結尾則建立目錄） |
 | `c` | 重新命名選取的檔案或資料夾 |
@@ -111,7 +116,7 @@ velocity -a
   [PATH]  起始資料夾路徑 [預設: 目前工作目錄]
 
 選項:
-  -i, --icons <ICONS>   圖示風格樣式 [預設: nerd] [可選值: nerd, emoji, ascii]
+  -i, --icons <ICONS>   圖示風格樣式 [預設: auto] [可選值: auto, nerd, emoji, ascii]
   -a, --all             顯示隱藏檔案與目錄 (以 '.' 開頭之名稱)
   -u, --update          檢查更新並自動升級至最新版本
       --check-update    僅檢查是否有新版本可用，不執行升級

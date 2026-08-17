@@ -1,9 +1,8 @@
 use crate::app::{App, InputMode};
-use crate::cli::IconStyle;
 use crate::config::{PREVIEW_MAX_BYTES, PREVIEW_MAX_LINES, THEME};
 use crate::fs::{format_size, format_time, read_preview, PreviewContent};
 use crate::git::GitFileStatus;
-use crate::icons::get_icon;
+use crate::icons::{get_folder_icon, get_git_branch_icon, get_icon};
 use crate::theme::get_file_color;
 use crossterm::cursor::MoveTo;
 use crossterm::style::{
@@ -96,15 +95,12 @@ pub fn render_ui<W: Write>(stdout: &mut W, app: &App, layout: &TerminalLayout) -
     stdout.queue(SetForegroundColor(THEME.title))?;
     stdout.queue(SetAttribute(Attribute::Bold))?;
 
-    let folder_icon = match app.icon_style {
-        IconStyle::Ascii => "[DIR]",
-        IconStyle::Emoji => "📁",
-        IconStyle::Nerd => "\u{f07c}",
-    };
+    let folder_icon = get_folder_icon(app.icon_style);
 
     let git_branch_str = if let Some(ref git) = app.git_info {
         if let Some(ref branch) = git.branch {
-            format!("  {} ", branch)
+            let branch_icon = get_git_branch_icon(app.icon_style);
+            format!(" {} {} ", branch_icon, branch)
         } else {
             String::new()
         }
@@ -414,7 +410,8 @@ pub fn render_ui<W: Write>(stdout: &mut W, app: &App, layout: &TerminalLayout) -
                 total_items,
             }) => {
                 let line_text = if row == 0 {
-                    format!(" 📁 目錄包含 {} 個項目", total_items)
+                    let dir_icon = get_folder_icon(app.icon_style);
+                    format!(" {} 目錄包含 {} 個項目", dir_icon, total_items)
                 } else if row == 1 {
                     String::new()
                 } else {
@@ -563,7 +560,7 @@ pub fn render_ui<W: Write>(stdout: &mut W, app: &App, layout: &TerminalLayout) -
             } else {
                 String::new()
             };
-            let shortcuts_str = "↑↓移動  →進入  ←上層  /搜尋  s排序  y複製路徑  a新增  c改名  d刪除  e編輯  .隱藏檔  q離開";
+            let shortcuts_str = "↑↓移動  →進入  ←上層  /搜尋  s排序  i圖示  y複製  a新增  c改名  d刪除  e編輯  .隱藏  q離開";
             let status_text = format!(" {} {}   {}", pos_str, filter_str, shortcuts_str);
             write!(stdout, "{}", fit_width(&status_text, layout.width as usize))?;
         }

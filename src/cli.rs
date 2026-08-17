@@ -5,6 +5,11 @@ use std::path::PathBuf;
 pub enum IconStyle {
     #[default]
     #[value(
+        name = "auto",
+        help = "Auto-detect Nerd Font availability, fallback to Emoji"
+    )]
+    Auto,
+    #[value(
         name = "nerd",
         help = "Nerd Font icons (requires a Nerd Font installed)"
     )]
@@ -16,6 +21,26 @@ pub enum IconStyle {
         help = "Plain ASCII indicators ([+] for dirs, spaces for files)"
     )]
     Ascii,
+}
+
+impl IconStyle {
+    pub fn next(self) -> Self {
+        match self {
+            IconStyle::Auto => IconStyle::Emoji,
+            IconStyle::Emoji => IconStyle::Nerd,
+            IconStyle::Nerd => IconStyle::Ascii,
+            IconStyle::Ascii => IconStyle::Auto,
+        }
+    }
+
+    pub fn display_name(self) -> &'static str {
+        match self {
+            IconStyle::Auto => "自動偵測 (Auto)",
+            IconStyle::Nerd => "Nerd Font",
+            IconStyle::Emoji => "Emoji",
+            IconStyle::Ascii => "ASCII",
+        }
+    }
 }
 
 #[derive(Parser, Debug)]
@@ -32,7 +57,7 @@ pub struct Cli {
     pub path: Option<PathBuf>,
 
     /// Icon display style
-    #[arg(short = 'i', long = "icons", value_enum, default_value = "nerd")]
+    #[arg(short = 'i', long = "icons", value_enum, default_value = "auto")]
     pub icons: IconStyle,
 
     /// Show hidden files and directories (names starting with '.')
