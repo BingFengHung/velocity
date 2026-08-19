@@ -300,14 +300,17 @@ fn highlight_markdown(line: &str) -> HighlightedLine {
     }
     if trimmed.starts_with("- ") || trimmed.starts_with("* ") || trimmed.starts_with("1. ") {
         let mut spans = Vec::new();
-        let bullet_len = line.len() - trimmed.len() + 2;
+        // Use byte offset: the start of trimmed within line, plus the bullet size
+        let indent_bytes = line.len() - trimmed.len();
+        let bullet_end_bytes = indent_bytes
+            + if trimmed.starts_with("1. ") { 3 } else { 2 };
         spans.push(HighlightSpan {
-            text: line[..bullet_len].to_string(),
+            text: line[..bullet_end_bytes].to_string(),
             color: COLOR_KEYWORD,
             is_bold: true,
         });
         spans.push(HighlightSpan {
-            text: line[bullet_len..].to_string(),
+            text: line[bullet_end_bytes..].to_string(),
             color: COLOR_DEFAULT,
             is_bold: false,
         });
@@ -345,20 +348,22 @@ fn highlight_generic_code(
     let mut in_string = false;
     let mut string_char = ' ';
 
-    let chars: Vec<char> = line.chars().collect();
+    // Collect (byte_offset, char) pairs so we can safely slice `line`
+    let char_indices: Vec<(usize, char)> = line.char_indices().collect();
+    let total = char_indices.len();
     let mut i = 0;
 
-    while i < chars.len() {
-        let ch = chars[i];
+    while i < total {
+        let (byte_off, ch) = char_indices[i];
 
-        // Check for comment start
-        if !in_string && line[i..].starts_with(comment_prefix) {
+        // Check for comment start using byte offset into the original &str
+        if !in_string && line[byte_off..].starts_with(comment_prefix) {
             if !current_token.is_empty() {
                 flush_token(&mut spans, &current_token, keywords, types);
                 current_token.clear();
             }
             spans.push(HighlightSpan {
-                text: line[i..].to_string(),
+                text: line[byte_off..].to_string(),
                 color: COLOR_COMMENT,
                 is_bold: false,
             });
@@ -378,7 +383,8 @@ fn highlight_generic_code(
             continue;
         } else if in_string {
             current_token.push(ch);
-            if ch == string_char && (i == 0 || chars[i - 1] != '\\') {
+            let prev_ch = if i > 0 { char_indices[i - 1].1 } else { '\0' };
+            if ch == string_char && prev_ch != '\\' {
                 in_string = false;
                 spans.push(HighlightSpan {
                     text: current_token.clone(),
