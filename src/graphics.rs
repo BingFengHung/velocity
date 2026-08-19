@@ -8,15 +8,30 @@ use std::path::Path;
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum GraphicsProtocol {
     #[default]
-    #[value(name = "auto", help = "Automatically detect terminal graphics protocol")]
+    #[value(
+        name = "auto",
+        help = "Automatically detect terminal graphics protocol"
+    )]
     Auto,
-    #[value(name = "kitty", help = "Kitty graphics protocol (Kitty, Ghostty, WezTerm)")]
+    #[value(
+        name = "kitty",
+        help = "Kitty graphics protocol (Kitty, Ghostty, WezTerm)"
+    )]
     Kitty,
-    #[value(name = "iterm2", help = "iTerm2 inline image protocol (iTerm2, WezTerm, Mintty)")]
+    #[value(
+        name = "iterm2",
+        help = "iTerm2 inline image protocol (iTerm2, WezTerm, Mintty)"
+    )]
     Iterm2,
-    #[value(name = "sixel", help = "Sixel graphics protocol (WezTerm, Foot, Windows Terminal)")]
+    #[value(
+        name = "sixel",
+        help = "Sixel graphics protocol (WezTerm, Foot, Windows Terminal)"
+    )]
     Sixel,
-    #[value(name = "blocks", help = "Half-block TrueColor Unicode rendering (universal fallback)")]
+    #[value(
+        name = "blocks",
+        help = "Half-block TrueColor Unicode rendering (universal fallback)"
+    )]
     Blocks,
 }
 

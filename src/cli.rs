@@ -37,11 +37,7 @@ pub struct Cli {
     pub icons: IconStyle,
 
     /// Terminal graphics protocol for high-resolution image preview
-    #[arg(
-        long = "image-protocol",
-        value_enum,
-        default_value = "auto"
-    )]
+    #[arg(long = "image-protocol", value_enum, default_value = "auto")]
     pub image_protocol: GraphicsProtocol,
 
     /// Show hidden files and directories (names starting with '.')
