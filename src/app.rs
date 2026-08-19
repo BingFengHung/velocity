@@ -1,8 +1,6 @@
 use crate::cli::IconStyle;
 use crate::config::SortMode;
-use crate::fs::{
-    create_file_or_dir, delete_entry, read_directory, rename_entry, FileEntry,
-};
+use crate::fs::{create_file_or_dir, delete_entry, read_directory, rename_entry, FileEntry};
 use crate::fuzzy::{fuzzy_match, FuzzyMatch};
 use crate::git::{get_git_status, GitFileStatus, GitRepoInfo};
 use crate::graphics::GraphicsProtocol;
