@@ -150,54 +150,36 @@ pub fn encode_sixel_image(
     Some(sixel)
 }
 
-/// Enhance image contrast and apply adaptive sharpening for crisp thumbnail rendering.
-/// Specially tuned for Half-Block terminal character rendering (cmd.exe / universal fallback).
+/// Enhance image for crisp Half-Block terminal rendering.
+/// Uses Lanczos3 + gentle saturation boost. No aggressive unsharp mask.
 pub fn sharpen_and_enhance_thumbnail(img: &DynamicImage, width: u32, height: u32) -> RgbaImage {
-    // 1. High-fidelity Lanczos3 Resampling — preserves edges best at small sizes
-    let resized = img.resize_exact(width, height, FilterType::Lanczos3);
+    // Resize with aspect-ratio preservation using Lanczos3 (best quality at small sizes)
+    let resized = img.resize(width, height, FilterType::Lanczos3);
     let mut rgba = resized.to_rgba8();
-    let (w, h) = rgba.dimensions();
 
-    // 2. Unsharp Mask pass — detect edges and boost local contrast
-    let blurred = image::imageops::blur(&rgba, 0.8);
-    for y in 0..h {
-        for x in 0..w {
-            let p = *rgba.get_pixel(x, y);
-            let b = *blurred.get_pixel(x, y);
-            let pixel = rgba.get_pixel_mut(x, y);
-            for c in 0..3usize {
-                let sharp = p[c] as i32 + (p[c] as i32 - b[c] as i32) * 2;
-                pixel[c] = sharp.clamp(0, 255) as u8;
-            }
-        }
-    }
-
-    // 3. Vivid S-curve contrast + saturation boost for vibrant terminal colours
+    // Gentle saturation + brightness-contrast lift (tuned for terminal viewing)
     for pixel in rgba.pixels_mut() {
-        if pixel[3] > 0 {
-            let r = pixel[0] as f32 / 255.0;
-            let g = pixel[1] as f32 / 255.0;
-            let b = pixel[2] as f32 / 255.0;
-
-            // Luminance-preserving saturation boost (1.35x)
-            let lum = 0.299 * r + 0.587 * g + 0.114 * b;
-            let sr = (lum + (r - lum) * 1.35).clamp(0.0, 1.0);
-            let sg = (lum + (g - lum) * 1.35).clamp(0.0, 1.0);
-            let sb = (lum + (b - lum) * 1.35).clamp(0.0, 1.0);
-
-            // S-curve contrast enhancement
-            let s_curve = |v: f32| -> f32 {
-                if v < 0.5 {
-                    2.0 * v * v
-                } else {
-                    1.0 - 2.0 * (1.0 - v) * (1.0 - v)
-                }
-            };
-
-            pixel[0] = (s_curve(sr) * 255.0) as u8;
-            pixel[1] = (s_curve(sg) * 255.0) as u8;
-            pixel[2] = (s_curve(sb) * 255.0) as u8;
+        let a = pixel[3];
+        if a == 0 {
+            continue;
         }
+
+        let r = pixel[0] as f32 / 255.0;
+        let g = pixel[1] as f32 / 255.0;
+        let b = pixel[2] as f32 / 255.0;
+
+        // Luminance-preserving saturation boost (1.25×)
+        let lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        let sr = (lum + (r - lum) * 1.25).clamp(0.0, 1.0);
+        let sg = (lum + (g - lum) * 1.25).clamp(0.0, 1.0);
+        let sb = (lum + (b - lum) * 1.25).clamp(0.0, 1.0);
+
+        // Very mild contrast stretch: lift blacks slightly, keep whites
+        let contrast = |v: f32| -> f32 { (v * 1.08 - 0.04).clamp(0.0, 1.0) };
+
+        pixel[0] = (contrast(sr) * 255.0) as u8;
+        pixel[1] = (contrast(sg) * 255.0) as u8;
+        pixel[2] = (contrast(sb) * 255.0) as u8;
     }
 
     rgba
