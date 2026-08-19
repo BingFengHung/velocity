@@ -617,4 +617,3 @@ pub fn open_with_system_default(path: &Path) -> Result<(), String> {
     #[allow(unreachable_code)]
     Err("無法以系統預設程式開啟此檔案".to_string())
 }
-
