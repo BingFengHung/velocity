@@ -360,7 +360,13 @@ pub fn render_ui<W: Write>(stdout: &mut W, app: &App, layout: &TerminalLayout) -
                     stdout.queue(SetForegroundColor(THEME.accent))?;
                     write!(stdout, "{}", fit_width(&info_line, right_cell_w))?;
                 } else if row == 1 {
-                    write!(stdout, "{}", " ".repeat(right_cell_w))?;
+                    if img_info.protocol_payload.is_none() {
+                        let hint = " 💡 按 'Enter' 或 'o' 以系統相片檢視器開啟清晰原圖";
+                        stdout.queue(SetForegroundColor(THEME.muted))?;
+                        write!(stdout, "{}", fit_width(hint, right_cell_w))?;
+                    } else {
+                        write!(stdout, "{}", " ".repeat(right_cell_w))?;
+                    }
                 } else {
                     let img_row = row - 2;
                     if let Some(ref payload) = img_info.protocol_payload {
@@ -571,7 +577,7 @@ pub fn render_ui<W: Write>(stdout: &mut W, app: &App, layout: &TerminalLayout) -
             } else {
                 String::new()
             };
-            let shortcuts_str = "↑↓移動  →進入  ←上層  /搜尋  s排序  i圖示  y複製  a新增  c改名  d刪除  e編輯  .隱藏  q離開";
+            let shortcuts_str = "↑↓移動  Enter進入/開啟  ←上層  /搜尋  o開啟  s排序  i圖示  y複製  a新增  c改名  d刪除  e編輯  .隱藏  q離開";
             let status_text = format!(" {} {}   {}", pos_str, filter_str, shortcuts_str);
             write!(stdout, "{}", fit_width(&status_text, layout.width as usize))?;
         }

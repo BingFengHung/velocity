@@ -92,10 +92,11 @@ velocity -a
 | `↑` `↓` / `k` `j` | Move cursor up / down |
 | `PgUp` `PgDn` | Scroll page up / down |
 | `Home` `End` | Jump to top / bottom |
-| `→` / `l` / `Enter` | Enter highlighted directory |
+| `→` / `l` / `Enter` | Enter directory / open file with default application |
 | `←` / `h` / `Backspace` | Go back to parent directory (cursor remembers previous folder) |
 | `/` | Instant fuzzy search / filter mode (`Enter` to confirm, `Esc` to cancel) |
-| `s` / `o` | Cycle sorting mode (Name → Time → Size → Extension) |
+| `o` | Open selected file with system default app (e.g. Photo Viewer) |
+| `s` | Cycle sorting mode (Name → Time → Size → Extension) |
 | `y` | Copy absolute file path to system clipboard |
 | `a` / `n` | Create new file or folder (append `/` for folder) |
 | `c` | Rename selected file or folder |

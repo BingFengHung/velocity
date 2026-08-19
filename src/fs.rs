@@ -586,3 +586,35 @@ pub fn open_in_editor(path: &Path) -> Result<(), String> {
     #[allow(unreachable_code)]
     Err("找不到可用的文字編輯器（請設定 $EDITOR 環境變數）".to_string())
 }
+
+pub fn open_with_system_default(path: &Path) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        let path_str = path.to_string_lossy();
+        if Command::new("cmd")
+            .args(["/C", "start", "", &path_str])
+            .spawn()
+            .is_ok()
+        {
+            return Ok(());
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        if Command::new("open").arg(path).spawn().is_ok() {
+            return Ok(());
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if Command::new("xdg-open").arg(path).spawn().is_ok() {
+            return Ok(());
+        }
+    }
+
+    #[allow(unreachable_code)]
+    Err("無法以系統預設程式開啟此檔案".to_string())
+}
+

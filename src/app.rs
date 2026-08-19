@@ -1,6 +1,9 @@
 use crate::cli::IconStyle;
 use crate::config::SortMode;
-use crate::fs::{create_file_or_dir, delete_entry, read_directory, rename_entry, FileEntry};
+use crate::fs::{
+    create_file_or_dir, delete_entry, open_with_system_default, read_directory, rename_entry,
+    FileEntry,
+};
 use crate::fuzzy::{fuzzy_match, FuzzyMatch};
 use crate::git::{get_git_status, GitFileStatus, GitRepoInfo};
 use crate::graphics::GraphicsProtocol;
@@ -177,6 +180,9 @@ impl App {
                 self.selected = 0;
                 self.scroll = 0;
                 self.reload_directory();
+            } else {
+                let _ = open_with_system_default(&item.entry.path);
+                self.set_status(format!("已用系統預設程式開啟: {}", item.entry.name));
             }
         }
     }
@@ -411,8 +417,14 @@ impl App {
                 self.filter.clear();
                 self.apply_filter();
             }
-            KeyCode::Char('s') | KeyCode::Char('S') | KeyCode::Char('o') => {
+            KeyCode::Char('s') | KeyCode::Char('S') => {
                 self.cycle_sort_mode();
+            }
+            KeyCode::Char('o') | KeyCode::Char('O') => {
+                if let Some(item) = self.filtered_items.get(self.selected) {
+                    let _ = open_with_system_default(&item.entry.path);
+                    self.set_status(format!("已用系統預設程式開啟: {}", item.entry.name));
+                }
             }
             KeyCode::Char('i') | KeyCode::Char('I') => {
                 self.cycle_icon_style();
