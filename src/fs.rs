@@ -8,7 +8,7 @@ use crate::syntax::{highlight_line, HighlightedLine};
 use chrono::{DateTime, Local};
 use image::{GenericImageView, ImageReader};
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader, Read};
+use std::io::{self, BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::SystemTime;

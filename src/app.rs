@@ -215,11 +215,26 @@ impl App {
     }
 
     pub fn cycle_icon_style(&mut self) {
-        self.icon_style = self.icon_style.next();
-        let effective = crate::icons::resolve_icon_style(self.icon_style);
+        self.icon_style = match self.icon_style {
+            IconStyle::Auto => IconStyle::Nerd,
+            IconStyle::Nerd => IconStyle::Emoji,
+            IconStyle::Emoji => IconStyle::Ascii,
+            IconStyle::Ascii => IconStyle::Auto,
+        };
         let desc = match self.icon_style {
-            IconStyle::Auto => format!("自動偵測 (當前生效: {})", effective.display_name()),
-            other => other.display_name().to_string(),
+            IconStyle::Auto => {
+                let effective = crate::icons::resolve_icon_style(self.icon_style);
+                let effective_name = match effective {
+                    IconStyle::Nerd => "Nerd Font",
+                    IconStyle::Emoji => "Emoji",
+                    IconStyle::Ascii => "ASCII",
+                    IconStyle::Auto => "Auto",
+                };
+                format!("自動偵測 (當前生效: {})", effective_name)
+            }
+            IconStyle::Nerd => "Nerd Font".to_string(),
+            IconStyle::Emoji => "Emoji".to_string(),
+            IconStyle::Ascii => "ASCII".to_string(),
         };
         self.set_status(format!("已切換圖示樣式: {}", desc));
     }

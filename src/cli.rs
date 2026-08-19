@@ -6,6 +6,11 @@ use std::path::PathBuf;
 pub enum IconStyle {
     #[default]
     #[value(
+        name = "auto",
+        help = "Auto-detect Nerd Font support (falls back to Emoji)"
+    )]
+    Auto,
+    #[value(
         name = "nerd",
         help = "Nerd Font icons (requires a Nerd Font installed)"
     )]
