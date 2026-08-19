@@ -302,8 +302,7 @@ fn highlight_markdown(line: &str) -> HighlightedLine {
         let mut spans = Vec::new();
         // Use byte offset: the start of trimmed within line, plus the bullet size
         let indent_bytes = line.len() - trimmed.len();
-        let bullet_end_bytes = indent_bytes
-            + if trimmed.starts_with("1. ") { 3 } else { 2 };
+        let bullet_end_bytes = indent_bytes + if trimmed.starts_with("1. ") { 3 } else { 2 };
         spans.push(HighlightSpan {
             text: line[..bullet_end_bytes].to_string(),
             color: COLOR_KEYWORD,
