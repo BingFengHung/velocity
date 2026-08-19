@@ -23,6 +23,7 @@ use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use crossterm::ExecutableCommand;
+use fs::open_in_editor;
 use std::io::{self, stdout};
 use std::panic;
 use std::path::PathBuf;
@@ -89,6 +90,25 @@ fn run_app<W: io::Write>(stdout: &mut W, app: &mut App) -> io::Result<()> {
 
         if app.should_quit {
             break;
+        }
+
+        // If the app wants to open an editor, suspend TUI first
+        if let Some(path) = app.pending_open_path.take() {
+            // 1. Restore terminal to normal mode
+            stdout.execute(Show)?;
+            stdout.execute(LeaveAlternateScreen)?;
+            disable_raw_mode()?;
+
+            // 2. Run the editor (blocks until it exits)
+            let _ = open_in_editor(&path);
+
+            // 3. Re-enter TUI
+            enable_raw_mode()?;
+            stdout.execute(EnterAlternateScreen)?;
+            stdout.execute(Hide)?;
+
+            needs_render = true;
+            continue;
         }
 
         let poll_duration = if app.status_message.is_some() {

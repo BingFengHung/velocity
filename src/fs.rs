@@ -532,6 +532,7 @@ pub fn format_time(time: Option<SystemTime>) -> String {
 }
 
 pub fn open_in_editor(path: &Path) -> Result<(), String> {
+    // Prefer $EDITOR / $VISUAL (always terminal editors, use .status() to wait)
     let editor = std::env::var("EDITOR")
         .or_else(|_| std::env::var("VISUAL"))
         .ok();
@@ -540,46 +541,48 @@ pub fn open_in_editor(path: &Path) -> Result<(), String> {
         if !ed.trim().is_empty() {
             let parts: Vec<&str> = ed.split_whitespace().collect();
             if let Some((cmd, args)) = parts.split_first() {
-                let status = Command::new(cmd).args(args).arg(path).status();
-                if status.is_ok() {
-                    return Ok(());
-                }
+                let _ = Command::new(cmd).args(args).arg(path).status();
+                return Ok(());
             }
         }
     }
 
+    // Platform fallbacks
     #[cfg(target_os = "windows")]
     {
-        if Command::new("cmd")
-            .args(["/C", "code", path.to_str().unwrap_or_default()])
-            .spawn()
+        // Try VS Code via PATH (terminal invocation — waits for window close via --wait)
+        if Command::new("code")
+            .arg("--wait")
+            .arg(path)
+            .status()
             .is_ok()
         {
             return Ok(());
         }
-        if Command::new("notepad.exe").arg(path).spawn().is_ok() {
-            return Ok(());
-        }
+        // Notepad is a GUI app — spawn without waiting (no way to block cleanly)
+        let _ = Command::new("notepad.exe").arg(path).spawn();
+        return Ok(());
     }
 
     #[cfg(target_os = "macos")]
     {
-        if Command::new("open").arg(path).spawn().is_ok() {
+        // 'open -W' waits for the application to exit
+        if Command::new("open").arg("-W").arg(path).status().is_ok() {
             return Ok(());
         }
     }
 
     #[cfg(target_os = "linux")]
     {
-        if Command::new("xdg-open").arg(path).spawn().is_ok() {
-            return Ok(());
-        }
         for fallback in &["nano", "vim", "vi"] {
             if Command::new(fallback).arg(path).status().is_ok() {
                 return Ok(());
             }
         }
+        let _ = Command::new("xdg-open").arg(path).spawn();
+        return Ok(());
     }
 
+    #[allow(unreachable_code)]
     Err("找不到可用的文字編輯器（請設定 $EDITOR 環境變數）".to_string())
 }

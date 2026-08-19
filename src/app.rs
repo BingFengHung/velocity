@@ -1,7 +1,7 @@
 use crate::cli::IconStyle;
 use crate::config::SortMode;
 use crate::fs::{
-    create_file_or_dir, delete_entry, open_in_editor, read_directory, rename_entry, FileEntry,
+    create_file_or_dir, delete_entry, read_directory, rename_entry, FileEntry,
 };
 use crate::fuzzy::{fuzzy_match, FuzzyMatch};
 use crate::git::{get_git_status, GitFileStatus, GitRepoInfo};
@@ -42,6 +42,8 @@ pub struct App {
     pub should_quit: bool,
     pub git_info: Option<GitRepoInfo>,
     pub status_message: Option<(String, Instant)>,
+    /// When set, the main loop will suspend the TUI, open this path in editor, then resume.
+    pub pending_open_path: Option<PathBuf>,
 }
 
 impl App {
@@ -74,6 +76,7 @@ impl App {
             should_quit: false,
             git_info: None,
             status_message: None,
+            pending_open_path: None,
         };
 
         app.reload_directory();
@@ -437,7 +440,8 @@ impl App {
             KeyCode::Char('e') | KeyCode::Char('E') => {
                 if let Some(item) = self.filtered_items.get(self.selected) {
                     if !item.entry.is_dir {
-                        let _ = open_in_editor(&item.entry.path);
+                        // Signal the main loop to suspend TUI, open editor, then resume
+                        self.pending_open_path = Some(item.entry.path.clone());
                     }
                 }
             }
