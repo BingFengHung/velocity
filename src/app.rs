@@ -5,6 +5,7 @@ use crate::fs::{
 };
 use crate::fuzzy::{fuzzy_match, FuzzyMatch};
 use crate::git::{get_git_status, GitFileStatus, GitRepoInfo};
+use crate::graphics::GraphicsProtocol;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::path::PathBuf;
 use std::time::Instant;
@@ -36,6 +37,7 @@ pub struct App {
     pub input_mode: InputMode,
     pub sort_mode: SortMode,
     pub icon_style: IconStyle,
+    pub image_protocol: GraphicsProtocol,
     pub show_hidden: bool,
     pub should_quit: bool,
     pub git_info: Option<GitRepoInfo>,
@@ -43,7 +45,12 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(initial_path: PathBuf, icon_style: IconStyle, show_hidden: bool) -> Self {
+    pub fn new(
+        initial_path: PathBuf,
+        icon_style: IconStyle,
+        image_protocol: GraphicsProtocol,
+        show_hidden: bool,
+    ) -> Self {
         let abs_path = std::fs::canonicalize(&initial_path).unwrap_or(initial_path);
         let abs_path = if let Ok(stripped) = abs_path.strip_prefix(r"\\?\") {
             stripped.to_path_buf()
@@ -62,6 +69,7 @@ impl App {
             input_mode: InputMode::Normal,
             sort_mode: SortMode::Name,
             icon_style,
+            image_protocol,
             show_hidden,
             should_quit: false,
             git_info: None,

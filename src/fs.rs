@@ -1,10 +1,14 @@
 use crate::archive::{read_zip_preview, ArchivePreviewInfo};
 use crate::config::SortMode;
+use crate::graphics::{
+    detect_graphics_protocol, encode_iterm2_image, encode_kitty_image, encode_sixel_image,
+    sharpen_and_enhance_thumbnail, GraphicsProtocol,
+};
 use crate::syntax::{highlight_line, HighlightedLine};
 use chrono::{DateTime, Local};
-use image::{imageops::FilterType, DynamicImage, GenericImageView, ImageReader};
+use image::{GenericImageView, ImageReader};
 use std::fs::{self, File};
-use std::io::{self, BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::SystemTime;
@@ -33,6 +37,7 @@ pub struct ImagePreviewInfo {
     pub orig_height: u32,
     pub format_name: String,
     pub grid: Vec<Vec<PixelCell>>,
+    pub protocol_payload: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -272,7 +277,12 @@ fn blend_color(fg: (u8, u8, u8), alpha: u8, bg: (u8, u8, u8)) -> (u8, u8, u8) {
     (r, g, b)
 }
 
-pub fn load_image_preview(path: &Path, max_w: usize, max_h: usize) -> Option<ImagePreviewInfo> {
+pub fn load_image_preview(
+    path: &Path,
+    max_w: usize,
+    max_h: usize,
+    protocol: GraphicsProtocol,
+) -> Option<ImagePreviewInfo> {
     if max_w == 0 || max_h == 0 {
         return None;
     }
@@ -283,18 +293,35 @@ pub fn load_image_preview(path: &Path, max_w: usize, max_h: usize) -> Option<Ima
         .map(|f| format!("{:?}", f).to_uppercase())
         .unwrap_or_else(|| "IMAGE".to_string());
 
-    let dynamic_img: DynamicImage = reader.decode().ok()?;
+    let dynamic_img = reader.decode().ok()?;
     let (orig_w, orig_h) = dynamic_img.dimensions();
 
     if orig_w == 0 || orig_h == 0 {
         return None;
     }
 
+    let active_protocol = if protocol == GraphicsProtocol::Auto {
+        detect_graphics_protocol()
+    } else {
+        protocol
+    };
+
+    let protocol_payload = match active_protocol {
+        GraphicsProtocol::Iterm2 => encode_iterm2_image(path, max_w, max_h),
+        GraphicsProtocol::Kitty => {
+            encode_kitty_image(&dynamic_img, (max_w * 10) as u32, (max_h * 20) as u32)
+        }
+        GraphicsProtocol::Sixel => {
+            encode_sixel_image(&dynamic_img, (max_w * 10) as u32, (max_h * 20) as u32)
+        }
+        _ => None,
+    };
+
+    // 3. High-Quality Lanczos3 + Sharpening Half-Block grid rendering (as default/fallback)
     let target_pixel_w = max_w as u32;
     let target_pixel_h = (max_h * 2) as u32;
 
-    let thumb = dynamic_img.resize(target_pixel_w, target_pixel_h, FilterType::Triangle);
-    let rgba_img = thumb.to_rgba8();
+    let rgba_img = sharpen_and_enhance_thumbnail(&dynamic_img, target_pixel_w, target_pixel_h);
     let (thumb_w, thumb_h) = rgba_img.dimensions();
 
     let mut grid = Vec::new();
@@ -338,6 +365,7 @@ pub fn load_image_preview(path: &Path, max_w: usize, max_h: usize) -> Option<Ima
         orig_height: orig_h,
         format_name: format_str,
         grid,
+        protocol_payload,
     })
 }
 
@@ -346,6 +374,7 @@ pub fn read_preview(
     max_lines: usize,
     max_bytes: u64,
     avail_width: usize,
+    protocol: GraphicsProtocol,
 ) -> PreviewContent {
     if entry.is_dir {
         match read_directory(&entry.path, true, SortMode::Name) {
@@ -382,7 +411,7 @@ pub fn read_preview(
         if IMAGE_EXTENSIONS.contains(&entry.extension.as_str()) {
             let img_max_h = max_lines.saturating_sub(2);
             let img_max_w = avail_width.saturating_sub(4);
-            if let Some(info) = load_image_preview(&entry.path, img_max_w, img_max_h) {
+            if let Some(info) = load_image_preview(&entry.path, img_max_w, img_max_h, protocol) {
                 return PreviewContent::Image(info);
             }
         }

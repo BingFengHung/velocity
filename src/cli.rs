@@ -1,14 +1,10 @@
+use crate::graphics::GraphicsProtocol;
 use clap::{Parser, ValueEnum};
 use std::path::PathBuf;
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum IconStyle {
     #[default]
-    #[value(
-        name = "auto",
-        help = "Auto-detect Nerd Font availability, fallback to Emoji"
-    )]
-    Auto,
     #[value(
         name = "nerd",
         help = "Nerd Font icons (requires a Nerd Font installed)"
@@ -21,26 +17,6 @@ pub enum IconStyle {
         help = "Plain ASCII indicators ([+] for dirs, spaces for files)"
     )]
     Ascii,
-}
-
-impl IconStyle {
-    pub fn next(self) -> Self {
-        match self {
-            IconStyle::Auto => IconStyle::Emoji,
-            IconStyle::Emoji => IconStyle::Nerd,
-            IconStyle::Nerd => IconStyle::Ascii,
-            IconStyle::Ascii => IconStyle::Auto,
-        }
-    }
-
-    pub fn display_name(self) -> &'static str {
-        match self {
-            IconStyle::Auto => "自動偵測 (Auto)",
-            IconStyle::Nerd => "Nerd Font",
-            IconStyle::Emoji => "Emoji",
-            IconStyle::Ascii => "ASCII",
-        }
-    }
 }
 
 #[derive(Parser, Debug)]
@@ -57,8 +33,16 @@ pub struct Cli {
     pub path: Option<PathBuf>,
 
     /// Icon display style
-    #[arg(short = 'i', long = "icons", value_enum, default_value = "auto")]
+    #[arg(short = 'i', long = "icons", value_enum, default_value = "nerd")]
     pub icons: IconStyle,
+
+    /// Terminal graphics protocol for high-resolution image preview
+    #[arg(
+        long = "image-protocol",
+        value_enum,
+        default_value = "auto"
+    )]
+    pub image_protocol: GraphicsProtocol,
 
     /// Show hidden files and directories (names starting with '.')
     #[arg(short = 'a', long = "all", default_value_t = false)]

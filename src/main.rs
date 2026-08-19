@@ -7,6 +7,7 @@ mod config;
 mod fs;
 mod fuzzy;
 mod git;
+mod graphics;
 mod icons;
 mod syntax;
 mod theme;
@@ -57,7 +58,7 @@ fn main() -> io::Result<()> {
         .path
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
-    let mut app = App::new(initial_path, args.icons, args.all);
+    let mut app = App::new(initial_path, args.icons, args.image_protocol, args.all);
 
     enable_raw_mode()?;
     let mut stdout = stdout();

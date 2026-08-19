@@ -215,8 +215,15 @@ pub fn render_ui<W: Write>(stdout: &mut W, app: &App, layout: &TerminalLayout) -
     // 3. Render Left List & Right Preview Lines
     let list_height = layout.inner_h as usize;
     let right_cell_w = layout.right_w.saturating_sub(3) as usize;
-    let preview_content =
-        selected_entry.map(|e| read_preview(e, PREVIEW_MAX_LINES, PREVIEW_MAX_BYTES, right_cell_w));
+    let preview_content = selected_entry.map(|e| {
+        read_preview(
+            e,
+            PREVIEW_MAX_LINES,
+            PREVIEW_MAX_BYTES,
+            right_cell_w,
+            app.image_protocol,
+        )
+    });
 
     for row in 0..list_height {
         let y = layout.top + 1 + (row as u16);
@@ -356,7 +363,11 @@ pub fn render_ui<W: Write>(stdout: &mut W, app: &App, layout: &TerminalLayout) -
                     write!(stdout, "{}", " ".repeat(right_cell_w))?;
                 } else {
                     let img_row = row - 2;
-                    if img_row < img_info.grid.len() {
+                    if let Some(ref payload) = img_info.protocol_payload {
+                        if img_row == 0 {
+                            write!(stdout, "{}", payload)?;
+                        }
+                    } else if img_row < img_info.grid.len() {
                         let cells = &img_info.grid[img_row];
                         let rendered_cols = cells.len().min(right_cell_w);
                         write!(stdout, " ")?;
